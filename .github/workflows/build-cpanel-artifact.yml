@@ -1,0 +1,95 @@
+name: Build cPanel Artifact
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout cPanel repo
+        uses: actions/checkout@v4
+
+      - name: Checkout TraderMemos
+        uses: actions/checkout@v4
+        with:
+          repository: sinhong2011/TraderMemos
+          path: TraderMemos
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: TraderMemos/api/go.mod
+          cache-dependency-path: TraderMemos/api/go.sum
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.16.0
+
+      - name: Build API binaries
+        working-directory: TraderMemos/api
+        env:
+          CGO_ENABLED: "0"
+        run: |
+          go build -ldflags "-s -w" -o ../../artifact/bin/server ./cmd/server
+          go build -ldflags "-s -w" -o ../../artifact/bin/tradermemos ./cmd/cli
+
+      - name: Build web SPA
+        working-directory: TraderMemos/web
+        env:
+          VITE_API: "/api/v1"
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+          mkdir -p ../../artifact/web
+          cp -R dist/. ../../artifact/web/
+
+      - name: Assemble cPanel artifact
+        run: |
+          cp cpanel/server.js artifact/server.js
+          cat > artifact/DEPLOYMENT-CPANEL.md <<'EOF'
+          # TraderMemos cPanel Deployment
+
+          Production domain: https://journal.ranksmedia.com
+
+          This artifact contains a Linux x64 Go API binary, static Vite web assets, and a Node.js Passenger launcher.
+
+          Required environment variables:
+
+          - TM_JWT_SECRET: strong 32+ character secret
+          - TM_DATABASE_URL: sqlite:///home/thesite1/tradermemos-app/data/tradermemos.db
+          - TM_ATTACH_DIR: /home/thesite1/tradermemos-app/data/attachments
+          - TM_PUBLIC_WEB_URL: https://journal.ranksmedia.com
+
+          Data lives in /home/thesite1/tradermemos-app/data.
+          EOF
+          tar -czf tradermemos-cpanel-artifact.tar.gz -C artifact .
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tradermemos-cpanel-artifact
+          path: tradermemos-cpanel-artifact.tar.gz
+
+      - name: Publish release artifact
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: cpanel-build
+          name: cPanel Build
+          body: Automated cPanel deployment artifact for TraderMemos.
+          files: tradermemos-cpanel-artifact.tar.gz
+          make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
