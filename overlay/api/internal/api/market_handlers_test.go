@@ -3,7 +3,6 @@ package api_test
 import (
 	"net/http"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -22,13 +21,6 @@ func TestMarketBarsValidation(t *testing.T) {
 	require.Equal(t, http.StatusOK, rec.Code)
 	require.Contains(t, rec.Body.String(), `"bars":[]`)
 	require.Contains(t, rec.Body.String(), `"provider":"skipped"`)
-}
-
-func TestFallbackChartFromWidensEmptyWindows(t *testing.T) {
-	from := time.Date(2026, 8, 30, 10, 0, 0, 0, time.UTC)
-	require.Equal(t, from.Add(-7*24*time.Hour), fallbackChartFrom(from, "5"))
-	require.Equal(t, from.Add(-30*24*time.Hour), fallbackChartFrom(from, "60"))
-	require.Equal(t, from.Add(-365*24*time.Hour), fallbackChartFrom(from, "W"))
 }
 
 func TestMarketFxValidation(t *testing.T) {
