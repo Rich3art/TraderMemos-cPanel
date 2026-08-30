@@ -70,7 +70,44 @@ function serveStatic(req, res) {
     file = join(webRoot, "index.html");
   }
   res.setHeader("Content-Type", contentType(file));
+  if (file.endsWith("index.html") || file.endsWith("sw.js")) {
+    res.setHeader("Cache-Control", "no-store, max-age=0");
+  }
   createReadStream(file).pipe(res);
+}
+
+function serveBrowserReset(_req, res) {
+  res.writeHead(200, {
+    "Content-Type": "text/html; charset=utf-8",
+    "Cache-Control": "no-store, max-age=0",
+    "Clear-Site-Data": '"cache", "storage"',
+  });
+  res.end(`<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8"><title>TraderMemos reset</title></head>
+  <body style="font-family:system-ui;background:#111;color:#fff;padding:32px">
+    <h1>Resetting TraderMemos browser cache...</h1>
+    <p>This tab will return to sign in in a moment.</p>
+    <script>
+      (async () => {
+        try { localStorage.removeItem("tm_api_base"); } catch {}
+        try { sessionStorage.clear(); } catch {}
+        try {
+          if ("caches" in window) {
+            for (const key of await caches.keys()) await caches.delete(key);
+          }
+        } catch {}
+        try {
+          if ("serviceWorker" in navigator) {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            await Promise.all(regs.map((reg) => reg.unregister()));
+          }
+        } catch {}
+        location.replace("/login?reset=" + Date.now());
+      })();
+    </script>
+  </body>
+</html>`);
 }
 
 function proxyApi(req, res) {
@@ -93,6 +130,10 @@ function proxyApi(req, res) {
 }
 
 http.createServer((req, res) => {
+  if (req.url.startsWith("/reset-browser")) {
+    serveBrowserReset(req, res);
+    return;
+  }
   if (req.url.startsWith("/api/") || req.url === "/healthz" || req.url === "/docs" || req.url === "/openapi.yaml") {
     proxyApi(req, res);
     return;
