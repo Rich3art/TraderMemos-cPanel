@@ -70,7 +70,11 @@ function serveStatic(req, res) {
     file = join(webRoot, "index.html");
   }
   res.setHeader("Content-Type", contentType(file));
-  if (file.endsWith("index.html") || file.endsWith("sw.js")) {
+  if (
+    file.endsWith("index.html") ||
+    file.endsWith("sw.js") ||
+    file.endsWith("manifest.webmanifest")
+  ) {
     res.setHeader("Cache-Control", "no-store, max-age=0");
   }
   createReadStream(file).pipe(res);
