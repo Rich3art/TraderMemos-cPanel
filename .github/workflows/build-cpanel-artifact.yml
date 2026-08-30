@@ -84,6 +84,12 @@ jobs:
           EOF
           tar -czf tradermemos-cpanel-artifact.tar.gz -C artifact .
 
+      - name: Remove previous release asset
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete-asset cpanel-build tradermemos-cpanel-artifact.tar.gz --yes || true
+
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
         with:
