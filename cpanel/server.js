@@ -7,9 +7,9 @@ const { request } = require("http");
 const root = __dirname;
 const webRoot = join(root, "web");
 const dataDir = process.env.TM_DATA_DIR || join(root, "data");
-const apiPort = process.env.TM_API_PORT || "18080";
 const port = Number(process.env.PORT || 3000);
 const host = process.env.HOSTNAME || "127.0.0.1";
+const apiPort = process.env.TM_API_PORT || String(port + 10000);
 
 const env = {
   ...process.env,
