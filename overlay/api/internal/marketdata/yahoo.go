@@ -130,10 +130,28 @@ func chartSymbol(req Request) string {
 func yahooAlias(sym string) string {
 	clean := strings.NewReplacer("/", "", "-", "", "_", "", " ", "").Replace(sym)
 	switch clean {
+	case "BTC", "BTCUSD":
+		return "BTC-USD"
+	case "ETH", "ETHUSD":
+		return "ETH-USD"
+	case "SOL", "SOLUSD":
+		return "SOL-USD"
 	case "XAUUSD", "GOLD":
 		return "GC=F"
 	case "XAGUSD", "SILVER":
 		return "SI=F"
+	case "GC", "GOLD FUTURES", "GOLD FUTURE":
+		return "GC=F"
+	case "SI", "SILVER FUTURES", "SILVER FUTURE":
+		return "SI=F"
+	case "ES", "ES1", "MES", "SP500FUTURES":
+		return "ES=F"
+	case "NQ", "NQ1", "MNQ", "NASDAQFUTURES":
+		return "NQ=F"
+	case "YM", "YM1", "MYM", "DOWFUTURES":
+		return "YM=F"
+	case "RTY", "RTY1", "M2K", "RUSSELLFUTURES":
+		return "RTY=F"
 	case "US30", "DJI", "DJ30":
 		return "^DJI"
 	case "NAS100", "USTEC", "NDX":
@@ -146,9 +164,9 @@ func yahooAlias(sym string) string {
 		return "^FTSE"
 	case "JPN225", "JP225", "NIKKEI":
 		return "^N225"
-	case "USOIL", "WTI":
+	case "USOIL", "WTI", "CL", "CL1", "CRUDEOIL":
 		return "CL=F"
-	case "BRENT", "UKOIL":
+	case "BRENT", "UKOIL", "BZ", "BZ1":
 		return "BZ=F"
 	}
 	return ""
