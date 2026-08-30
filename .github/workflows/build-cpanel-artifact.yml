@@ -22,6 +22,12 @@ jobs:
           repository: sinhong2011/TraderMemos
           path: TraderMemos
 
+      - name: Apply cPanel patches
+        run: |
+          if [ -d overlay ]; then
+            cp -R overlay/. TraderMemos/
+          fi
+
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
