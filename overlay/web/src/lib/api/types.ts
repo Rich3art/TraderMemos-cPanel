@@ -1,0 +1,515 @@
+// API DTO types matching the server's snake_case JSON output exactly.
+
+export interface Filters {
+  account_id?: string;
+  from?: string;
+  to?: string;
+  symbol?: string;
+  status?: string;
+  side?: string;
+  duration?: string;
+  /** Attribute date filters / daily buckets by close or open timestamp. */
+  date_basis?: "close" | "open";
+  /** IANA timezone for day / hour / weekday bucketing (server-side). */
+  tz?: string;
+}
+
+/** One calendar day scored against the user's risk rules. */
+export interface ComplianceDay {
+  date: string;
+  net_pnl: number;
+  trades: number;
+  risk_violations: number;
+  unknown_risk: number;
+  daily_loss_breach: boolean;
+  trade_limit_breach: boolean;
+  loss_streak_breach: boolean;
+  compliant: boolean;
+}
+
+export interface ComplianceReport {
+  rules_configured: boolean;
+  days: ComplianceDay[];
+  compliant_days: number;
+  breach_days: number;
+  compliant_pnl: number;
+  breach_pnl: number;
+  risk_violations: number;
+  unknown_risk: number;
+  daily_loss_breaches: number;
+  trade_limit_breaches: number;
+  loss_streak_breaches: number;
+}
+
+/** One trade flagged by a behavioral detector, with the evidence. */
+export interface BehaviorEvent {
+  date: string;
+  trade_id: string;
+  symbol: string;
+  trigger_trade_id?: string;
+  reason: "quick_reentry" | "size_escalation";
+  size_ratio?: number;
+  net_pnl: number;
+}
+
+/** Outcome comparison for one group of trades. */
+export interface OutcomeSplit {
+  trades: number;
+  wins: number;
+  win_rate: number;
+  net_pnl: number;
+}
+
+export interface RevengeSection {
+  insufficient_data: boolean;
+  events: BehaviorEvent[];
+  flagged: OutcomeSplit;
+  baseline: OutcomeSplit;
+}
+
+export interface OverconfidenceSection {
+  insufficient_data: boolean;
+  streaks: number;
+  events: BehaviorEvent[];
+  flagged: OutcomeSplit;
+  baseline: OutcomeSplit;
+}
+
+/** A losing trade that was profitable at its peak (recorded MFE > 0). */
+export interface GiveBack {
+  date: string;
+  trade_id: string;
+  symbol: string;
+  mfe: number;
+  net_pnl: number;
+}
+
+export interface LossAversionSection {
+  insufficient_data: boolean;
+  avg_win_hold_secs: number;
+  avg_loss_hold_secs: number;
+  median_win_hold_secs: number;
+  median_loss_hold_secs: number;
+  hold_ratio: number;
+  give_backs: GiveBack[];
+  give_back_count: number;
+  missed_profit: number;
+  excluded: number;
+}
+
+export interface BehaviorReport {
+  trades: number;
+  revenge: RevengeSection;
+  overconfidence: OverconfidenceSection;
+  loss_aversion: LossAversionSection;
+}
+
+/**
+ * One axis of the execution-quality composite (Go: analytics.AxisScore).
+ * `score` is null — not zero — when too few trades carry the axis's inputs.
+ */
+export interface ExecAxisScore {
+  score: number | null;
+  scored: number;
+  excluded: number;
+}
+
+/** One drill-down series bucket (Go: analytics.ExecScorePoint). */
+export interface ExecScorePoint {
+  date: string;
+  trades: number;
+  composite: number | null;
+  entry: number | null;
+  exit: number | null;
+  risk: number | null;
+  stability: number | null;
+  tempo: number | null;
+}
+
+/** Payload of GET /analytics/execution-score (Go: analytics.ExecScoreReport). */
+export interface ExecScoreReport {
+  trades: number;
+  rules_configured: boolean;
+  bucket: "week" | "month";
+  composite: number | null;
+  entry: ExecAxisScore;
+  exit: ExecAxisScore;
+  risk: ExecAxisScore;
+  stability: ExecAxisScore;
+  tempo: ExecAxisScore;
+  series: ExecScorePoint[];
+}
+
+export interface Tokens {
+  access_token: string;
+  refresh_token: string;
+}
+
+export interface Account {
+  id: string;
+  user_id: string;
+  name: string;
+  broker: string;
+  account_type: string;
+  base_currency: string;
+  starting_balance: number;
+  created_at: string;
+}
+
+export interface Tag {
+  id: string;
+  user_id: string;
+  name: string;
+  color: string;
+  description: string;
+  kind: string;
+}
+
+export interface Setup {
+  id: string;
+  user_id: string;
+  name: string;
+  description: string;
+  created_at: string;
+  thesis: string;
+  symbol: string;
+  direction: string;
+  target_price: number | null;
+  stop_price: number | null;
+  checklist: string[];
+  attachments?: SetupAttachment[];
+}
+
+export interface SetupAttachment {
+  id: string;
+  user_id: string;
+  setup_id: string;
+  filename: string;
+  content_type: string;
+  size_bytes: number;
+  storage_key: string;
+  created_at: string;
+}
+
+export interface Execution {
+  id: string;
+  user_id: string;
+  account_id: string;
+  external_id: string | null;
+  symbol: string;
+  instrument_type: string;
+  side: string;
+  quantity: number;
+  price: number;
+  fees: number;
+  commission: number;
+  executed_at: string;
+  multiplier: number;
+  /** Option contract fields: option_right, strike, expiry (and optional lot). */
+  details: Record<string, string> | null;
+  import_batch_id: string | null;
+  dedup_hash: string;
+  created_at: string;
+}
+
+export interface TradeAttachment {
+  id: string;
+  user_id: string;
+  trade_id: string;
+  filename: string;
+  content_type: string;
+  size_bytes: number;
+  storage_key: string;
+  created_at: string;
+}
+
+// Trade matches tradeDTO from api/internal/api/dto.go
+export interface Trade {
+  id: string;
+  account_id: string;
+  symbol: string;
+  instrument_type: string;
+  direction: string;
+  status: string;
+  opened_at: string;
+  closed_at: string | null;
+  qty_opened: number;
+  qty_remaining: number;
+  avg_entry_price: number;
+  avg_exit_price: number | null;
+  gross_pnl: number | null;
+  fees_total: number;
+  net_pnl: number | null;
+  pnl_currency: string;
+  return_pct: number | null;
+  time_in_trade_secs: number | null;
+  notes: string;
+  tags: Tag[];
+  initial_risk?: number | null;
+}
+
+// TradeDetail matches tradeDetailDTO from api/internal/api/trade_detail.go
+export interface TradeDetail extends Trade {
+  fills: Execution[];
+  setup: Setup | null;
+  /** Ordered setup ids; first is the main setup (matches journal.setup_id). */
+  setup_ids?: string[];
+  initial_risk: number | null;
+  target_price: number | null;
+  stop_price: number | null;
+  r_multiple: number | null;
+  emotional_state: string;
+  confidence: number | null;
+  trade_quality: number | null;
+  mae: number | null;
+  mfe: number | null;
+  post_exit_mae: number | null;
+  post_exit_mfe: number | null;
+  dividend_total: number;
+  total_pnl: number | null;
+  attachments: TradeAttachment[];
+}
+
+// Summary matches analytics.Summary from api/internal/analytics/analytics.go
+export interface Summary {
+  total_trades: number;
+  wins: number;
+  losses: number;
+  breakeven: number;
+  win_rate: number;
+  net_pnl: number;
+  /** Before-fees P&L; optional to tolerate an older API without it. */
+  gross_pnl?: number;
+  gross_profit: number;
+  gross_loss: number;
+  profit_factor: number;
+  expectancy: number;
+  avg_win: number;
+  avg_loss: number;
+  avg_trade: number;
+  largest_win: number;
+  largest_loss: number;
+  total_fees: number;
+  /**
+   * Medians mirror avg_* (median_loss is a positive magnitude). Optional so a
+   * newer web build degrades gracefully against an older API.
+   */
+  median_win?: number;
+  median_loss?: number;
+  median_trade?: number;
+  /** Full-Kelly % of capital; 0 when there isn't at least one win and one loss. */
+  kelly_pct?: number;
+  /** System Quality Number on per-trade net P&L; 0 when undefined. */
+  sqn?: number;
+}
+
+export interface RBucket {
+  label: string;
+  count: number;
+  from: number;
+  to: number;
+}
+
+/** R-mode summary — dollar fields are in R units when from /analytics/r-summary. */
+export interface RSummary extends Summary {
+  excluded: number;
+  avg_r: number;
+  avg_win_r: number;
+  avg_loss_r: number;
+  best_r: number;
+  worst_r: number;
+  distribution: RBucket[];
+}
+
+// EquityPoint and EquityCurve match analytics.Equity from analytics/analytics.go
+export interface EquityPoint {
+  at: string;
+  equity: number;
+}
+export interface EquityCurve {
+  points: EquityPoint[];
+  max_drawdown: number;
+}
+
+// MonteCarloResult matches analytics.MonteCarloResult from analytics/montecarlo.go
+export interface McBand {
+  n: number;
+  p05: number;
+  p25: number;
+  p50: number;
+  p75: number;
+  p95: number;
+}
+export interface MonteCarloResult {
+  insufficient_data: boolean;
+  trades: number;
+  paths: number;
+  horizon: number;
+  seed: number;
+  steps: McBand[];
+  terminal: {
+    p05: number;
+    p25: number;
+    p50: number;
+    p75: number;
+    p95: number;
+    mean: number;
+    prob_negative: number;
+  };
+  max_drawdown: { p50: number; p90: number; p95: number; p99: number; worst: number };
+  /** A few individual simulated paths, equity at the same checkpoints as steps. */
+  sample_paths: number[][];
+  risk_of_ruin: number;
+  ruin_threshold: number;
+  historical_max_drawdown: number;
+}
+
+// BreakGroup matches analytics.BreakGroup from analytics/breakdown.go
+export interface BreakGroup {
+  key: string;
+  summary: Summary;
+}
+
+export interface CashTransaction {
+  id: string;
+  user_id: string;
+  account_id: string;
+  type: string;
+  amount: number;
+  currency: string;
+  occurred_at: string;
+  note: string;
+  trade_id: string | null;
+  import_batch_id?: string | null;
+  created_at: string;
+}
+
+export type JournalNoteType = "note" | "daily_log";
+
+export interface JournalNoteSymbol {
+  symbol: string;
+  body: string;
+}
+
+export interface JournalNote {
+  id: string;
+  type: JournalNoteType;
+  occurred_at: string;
+  title: string;
+  body: string;
+  symbols: JournalNoteSymbol[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ImportBatch {
+  id: string;
+  user_id: string;
+  account_id: string;
+  source: string;
+  filename: string | null;
+  column_mapping: string | null;
+  row_count: number;
+  status: string;
+  created_at: string;
+}
+
+export interface RowError {
+  row: number;
+  message: string;
+}
+
+// ImportPreview is the response from POST /imports
+export interface JournalTradePreview {
+  row: number;
+  symbol: string;
+  market: string;
+  instrument_type?: string;
+  option_right?: string;
+  side: string;
+  status?: string;
+  qty: number;
+  entry: number;
+  exit: number;
+  entry_total?: number;
+  exit_total?: number;
+  return_usd: number;
+  return_pct?: number;
+  dividends?: number;
+  open_date: string;
+  close_date: string;
+  tags?: string;
+  setup?: string;
+  confidence?: string;
+  target?: string;
+  stop?: string;
+  notes?: string;
+}
+
+export interface JournalPreviewSummary {
+  row_count: number;
+  trade_count: number;
+  execution_count: number;
+  net_pnl: number;
+  stock_trades: number;
+  option_trades: number;
+  error_count: number;
+}
+
+export interface PendingImportAccount {
+  name: string;
+  broker?: string;
+  account_type?: string;
+  base_currency?: string;
+  starting_balance?: number;
+}
+
+export interface ImportPreview {
+  /** Always empty — batch is created on confirm only. */
+  import_batch_id: string;
+  /** Matched/selected account, or empty when pending_account is set. */
+  account_id?: string;
+  /** Proposed new account from JSON — created only on confirm. */
+  pending_account?: PendingImportAccount;
+  headers: string[];
+  sample_rows: Record<string, string>[];
+  suggested_mapping: Record<string, string>;
+  /** Broker preset name when the header signature matched (e.g. "Webull (Orders)"). */
+  detected_broker?: string;
+  /**
+   * IANA zone the file's offset-less timestamps are assumed to be in
+   * (from the broker preset). Override with `source_tz` on commit.
+   */
+  suggested_source_tz?: string;
+  /** "journal_trades" for closed-trade journal CSVs; "executions" for fill CSVs */
+  format?: "journal_trades" | "executions";
+  /** Upload source detected by the API; "statement" = MetaTrader report */
+  source?: "csv" | "json" | "statement";
+  row_count?: number;
+  journal_summary?: JournalPreviewSummary;
+  sample_trades?: JournalTradePreview[];
+}
+
+// ImportResult is the response from POST /imports/:id/commit
+export interface ImportResult {
+  inserted: number;
+  skipped: number;
+  annotated?: number;
+  /** Journal imports: closed round-trip count (fills = inserted) */
+  trades?: number;
+  cash_inserted?: number;
+  setups_upserted?: number;
+  format?: string;
+  errors: RowError[];
+}
+
+export interface Attachment {
+  id: string;
+  user_id: string;
+  trade_id: string;
+  filename: string;
+  content_type: string;
+  size_bytes: number;
+  storage_key: string;
+  created_at: string;
+}
