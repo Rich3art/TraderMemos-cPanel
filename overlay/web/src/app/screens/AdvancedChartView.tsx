@@ -7,6 +7,7 @@ import { Page } from "@/components/Page";
 import { Button } from "@/components/ui/button";
 import type { BarInterval } from "@/lib/api/market";
 import { snapChartTime, useMarketBars } from "@/lib/hooks/useMarketBars";
+import { inferMarketFromSymbol } from "@/lib/marketInference";
 
 /** How far back to load per interval — roughly what fits a readable chart. */
 const LOOKBACK_MS: Record<BarInterval, number> = {
@@ -45,7 +46,7 @@ export function AdvancedChartView({
 
   const barsQ = useMarketBars({
     symbol,
-    instrument_type: "stock",
+    instrument_type: inferMarketFromSymbol(symbol),
     from: range.from,
     to: range.to,
     interval,
