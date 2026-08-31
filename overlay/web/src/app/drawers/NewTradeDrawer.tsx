@@ -75,9 +75,9 @@ import {
   CUSTOM_PRESET_ID,
   FUTURES_PRESETS,
   multiplierForPreset,
-  presetIdForSymbol,
 } from "@/lib/futuresPresets";
 import { capScreenshots, useJournalPrefs } from "@/lib/journalPrefs";
+import { MARKET_LABELS, marketDefaultsForSymbol } from "@/lib/marketInference";
 import {
   buildStructuredJournalNotes,
   computeInitialRisk,
@@ -136,13 +136,6 @@ import { listTradeTemplates, saveTradeTemplate, type TradeTemplate } from "@/lib
 import { isImportPreviewEditId } from "@/lib/importTradePreview";
 import { useUI } from "@/lib/ui";
 
-const MARKETS = [
-  { value: "stock", label: "STOCK" },
-  { value: "option", label: "OPTION" },
-  { value: "crypto", label: "CRYPTO" },
-  { value: "future", label: "FUTURES" },
-  { value: "forex", label: "FOREX" },
-];
 const EMOTION_OPTIONS: MultiSelectOption[] = EMOTIONAL_STATES.map((s) => ({ value: s, label: s }));
 /**
  * Fill rows become a table only once the card can show every column in full —
@@ -567,6 +560,17 @@ function SymbolCard({
   );
   const set = <K extends keyof SymbolTradeBlock>(key: K, value: SymbolTradeBlock[K]) =>
     form.setFieldValue(`${base}.${key}` as never, value as never);
+  const applySymbol = (rawSymbol: string) => {
+    const symbol = rawSymbol.toUpperCase();
+    const defaults = marketDefaultsForSymbol(symbol);
+    form.setFieldValue(`${base}.symbol` as never, symbol as never);
+    set("market", defaults.market);
+    set("futuresPresetId", defaults.futuresPresetId);
+    set("multiplier", defaults.multiplier);
+    set("option_right", defaults.option_right);
+    set("option_strike", defaults.option_strike);
+    set("option_expiry", defaults.option_expiry);
+  };
   const dropRow = (predicate: (row: ExecutionRow, rowIndex: number) => boolean) => {
     const next = block.rows.filter((row, rowIndex) => !predicate(row, rowIndex));
     if (next.length) form.setFieldValue(`${base}.rows` as never, next as never);
@@ -663,35 +667,18 @@ function SymbolCard({
         <div className="relative z-[1] flex flex-col gap-4">
           <div className="grid grid-cols-2 items-start gap-3 @min-[38rem]/symbol:grid-cols-4">
             <Field label="Market">
-              <NativeSelect
-                aria-label={`Market symbol ${index + 1}`}
-                value={block.market}
-                onChange={(e) => {
-                  const market = e.target.value;
-                  const next = market === "futures" ? "future" : market;
-                  set("market", next);
-                  if (next === "option") {
-                    set("multiplier", "100");
-                    if (!block.option_right) set("option_right", "call");
-                  } else if (next === "future") {
-                    set("futuresPresetId", presetIdForSymbol(block.symbol));
-                    set("multiplier", String(multiplierForPreset(presetIdForSymbol(block.symbol))));
-                  } else {
-                    set("multiplier", "1");
-                    set("option_right", "");
-                    set("option_strike", "");
-                    set("option_expiry", "");
-                  }
-                }}
-                className={fieldTextClass}
-                wrapperClassName="w-full"
+              <div
+                aria-label={`Auto market symbol ${index + 1}`}
+                className={cn(
+                  fieldInputClass,
+                  "flex items-center justify-between gap-2 px-2.5 text-[12px] font-semibold tracking-widest",
+                )}
               >
-                {MARKETS.map((m) => (
-                  <NativeSelectOption key={m.value} value={m.value}>
-                    {m.label}
-                  </NativeSelectOption>
-                ))}
-              </NativeSelect>
+                <span>{MARKET_LABELS[block.market as keyof typeof MARKET_LABELS] ?? "STOCK"}</span>
+                <span className="text-[10px] font-medium tracking-normal text-muted-foreground">
+                  Auto
+                </span>
+              </div>
             </Field>
             {block.market === "future" && (
               <Field label="Contract">
@@ -723,9 +710,7 @@ function SymbolCard({
                     aria-label={`Symbol${suffix}`}
                     value={field.state.value as string}
                     onChange={(e) => {
-                      field.handleChange(e.target.value.toUpperCase() as never);
-                      if (block.market === "future")
-                        set("futuresPresetId", presetIdForSymbol(e.target.value));
+                      applySymbol(e.target.value);
                     }}
                     onBlur={field.handleBlur}
                     placeholder="Ticker"

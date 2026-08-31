@@ -226,6 +226,25 @@ describe("NewTradeDrawer", () => {
     await waitFor(() => expect(screen.getAllByText("+$100.00").length).toBeGreaterThanOrEqual(2));
   });
 
+  it("infers the market from the symbol instead of asking for a market", async () => {
+    const user = userEvent.setup();
+    wrap(<NewTradeDrawer />);
+    expect(screen.queryByRole("combobox", { name: "Market symbol 1" })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Auto market symbol 1")).toHaveTextContent("STOCK");
+
+    await user.type(screen.getByLabelText("Symbol"), "BTCUSDT");
+    expect(screen.getByLabelText("Auto market symbol 1")).toHaveTextContent("CRYPTO");
+    await user.type(screen.getByLabelText("Qty row 1"), "1");
+    await user.type(screen.getByLabelText("Price row 1"), "100000");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(mockedCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ symbol: "BTCUSDT", instrument_type: "crypto" }),
+      ),
+    );
+  });
+
   it("shows validation errors for an empty form", async () => {
     wrap(<NewTradeDrawer />);
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
