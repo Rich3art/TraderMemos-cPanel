@@ -8,6 +8,7 @@ import {
   ChevronUp,
   Eye,
   EyeOff,
+  ImageIcon,
   ListFilter,
   Pencil,
   Plus,
@@ -23,12 +24,14 @@ import { Pill } from "@/components/Pill";
 import { ListSkeleton } from "@/components/skeletons/list-skeleton";
 import { pnlColor } from "@/components/theme-tokens";
 import { Button } from "@/components/ui/button";
+import { setupsApi } from "@/lib/api/setups";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import type { BreakGroup, Setup } from "@/lib/api/types";
 import { cn } from "@/lib/cn";
 import { usePrivacyMode } from "@/lib/displayPrefs";
 import { fmtPct, fmtSignedMoney } from "@/lib/format";
 import { useMoneyFx } from "@/lib/hooks/useMoneyFx";
+import { useAuthedAttachmentUrls } from "@/lib/hooks/useAuthedAttachmentUrls";
 import { intlLocale } from "@/lib/locale";
 import { useUI, type SetupDraft } from "@/lib/ui";
 
@@ -163,6 +166,48 @@ function planBits(setup: Setup): string[] {
 
 function setupSubline(setup: Setup): string {
   return setup.thesis || setup.description || planBits(setup).join(" · ");
+}
+
+function PlayExamples({ setup, compact = false }: { setup: Setup; compact?: boolean }) {
+  const attachments = setup.attachments ?? [];
+  const preview = attachments.slice(0, compact ? 2 : 3);
+  const urls = useAuthedAttachmentUrls(
+    preview.map((att) => att.id),
+    setupsApi.attachmentFileUrl,
+  );
+  if (attachments.length === 0) return null;
+
+  return (
+    <div
+      className={cn("mt-2 flex items-center gap-1.5", compact && "mt-1")}
+      aria-label={`${attachments.length} playbook example screenshot${attachments.length === 1 ? "" : "s"}`}
+    >
+      {preview.map((att) => {
+        const src = urls.get(att.id);
+        return (
+          <span
+            key={att.id}
+            className={cn(
+              "flex shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-muted",
+              compact ? "size-7" : "size-10",
+            )}
+            title={att.filename}
+          >
+            {src ? (
+              <img src={src} alt={att.filename} className="h-full w-full object-cover" />
+            ) : (
+              <ImageIcon size={compact ? 13 : 16} strokeWidth={1.5} aria-hidden />
+            )}
+          </span>
+        );
+      })}
+      {attachments.length > preview.length ? (
+        <span className="text-[11px] tabular-nums text-muted-foreground">
+          +{attachments.length - preview.length}
+        </span>
+      ) : null}
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -396,6 +441,7 @@ function TradedPlayRow({ row, currency, fxRate, ...actions }: PlayRowProps) {
               {subline}
             </p>
           ) : null}
+          <PlayExamples setup={setup} />
           <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-[11px] tabular-nums whitespace-nowrap text-muted-foreground xl:hidden">
             <span>
               {trades} trade{trades === 1 ? "" : "s"}
@@ -456,6 +502,7 @@ function UnusedPlayChip({ row, ...actions }: { row: SetupRowModel } & RowActions
           <span className="shrink-0 text-[11px] tracking-wide text-primary">{setup.symbol}</span>
         ) : null}
       </ItemTitle>
+      <PlayExamples setup={setup} compact />
       <ItemActions className="gap-0.5">
         <SetupActions setup={setup} {...actions} />
       </ItemActions>
