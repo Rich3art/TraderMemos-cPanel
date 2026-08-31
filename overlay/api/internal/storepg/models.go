@@ -107,6 +107,12 @@ type ChecklistTemplate struct {
 	Content   string    `json:"content"`
 }
 
+type PsychologyQuestionSetting struct {
+	UserID    string    `json:"user_id"`
+	Questions string    `json:"questions"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 type CoachReview struct {
 	ID         string    `json:"id"`
 	UserID     string    `json:"user_id"`

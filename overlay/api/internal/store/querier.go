@@ -67,6 +67,7 @@ type Querier interface {
 	GetMarketBarsCache(ctx context.Context, cacheKey string) (MarketBarsCache, error)
 	GetMediaFile(ctx context.Context, arg GetMediaFileParams) (MediaFile, error)
 	GetOcrSettings(ctx context.Context) (GetOcrSettingsRow, error)
+	GetPsychologyQuestions(ctx context.Context, userID string) (PsychologyQuestionSetting, error)
 	GetPropSettings(ctx context.Context, arg GetPropSettingsParams) (PropSetting, error)
 	GetRiskRules(ctx context.Context, userID string) (RiskRule, error)
 	GetSetup(ctx context.Context, arg GetSetupParams) (Setup, error)
@@ -163,6 +164,7 @@ type Querier interface {
 	UpsertInstrumentSpec(ctx context.Context, arg UpsertInstrumentSpecParams) error
 	UpsertMarketBarsCache(ctx context.Context, arg UpsertMarketBarsCacheParams) error
 	UpsertOcrSettings(ctx context.Context, arg UpsertOcrSettingsParams) (OcrSetting, error)
+	UpsertPsychologyQuestions(ctx context.Context, arg UpsertPsychologyQuestionsParams) (PsychologyQuestionSetting, error)
 	UpsertPropSettings(ctx context.Context, arg UpsertPropSettingsParams) (PropSetting, error)
 	UpsertRiskRules(ctx context.Context, arg UpsertRiskRulesParams) (RiskRule, error)
 	UpsertTrade(ctx context.Context, arg UpsertTradeParams) error

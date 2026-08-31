@@ -1,0 +1,492 @@
+import { screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import type { ComponentProps } from "react";
+import { describe, expect, it, beforeEach, vi } from "vite-plus/test";
+import { Toaster } from "@/components/Toaster";
+import { ThemeProvider } from "@/components/theme-provider";
+import type { Account, CashTransaction, Tag } from "@/lib/api/types";
+import { renderWithI18n } from "@/test/renderWithI18n";
+import { DEFAULT_LOCALE, setStoredLocale } from "@/lib/locale";
+import { SettingsView } from "./SettingsView";
+
+function renderSettings(props: ComponentProps<typeof SettingsView>) {
+  return renderWithI18n(
+    <ThemeProvider defaultTheme="dark">
+      <Toaster>
+        <SettingsView {...props} />
+      </Toaster>
+    </ThemeProvider>,
+  );
+}
+
+vi.mock("../../lib/hooks/useTrades", () => ({
+  useTrades: () => ({ data: [], isLoading: false, isError: false }),
+}));
+
+vi.mock("@tanstack/react-router", () => ({
+  Link: ({ children, className }: { children?: unknown; className?: string }) => (
+    <a href="#mock" className={className}>
+      {children as never}
+    </a>
+  ),
+  useNavigate: () => () => {},
+}));
+
+vi.mock("../../lib/hooks/useImports", () => ({
+  useImports: () => ({ data: [], isLoading: false, isError: false }),
+  useDeleteImport: () => ({ mutate: () => {}, isPending: false }),
+}));
+
+// RulesTab reads YTD net P&L for the annual-goal progress readout.
+vi.mock("../../lib/hooks/useAnalytics", () => ({
+  useSummary: () => ({ data: undefined, isLoading: false, isError: false }),
+}));
+
+vi.mock("../../lib/hooks/useFlexSync", () => ({
+  useFlexSync: () => ({ data: undefined, isLoading: false, isError: false }),
+  useFlexSyncConnections: () => ({ data: [], isLoading: false, isError: false }),
+  useFlexSyncAttention: () => false,
+  useSaveFlexSync: () => ({ mutate: () => {}, isPending: false }),
+  useDeleteFlexSync: () => ({ mutate: () => {}, isPending: false }),
+  useRunFlexSync: () => ({ mutate: () => {}, isPending: false }),
+}));
+
+vi.mock("../../lib/hooks/useAlerts", () => ({
+  useAlertSettings: () => ({
+    data: {
+      enabled: false,
+      timezone: "",
+      rule_risk: true,
+      rule_daily_loss: true,
+      rule_loss_streak: true,
+      loss_streak_n: 3,
+      rule_prop_drawdown: true,
+      prop_warn_pct: 0.8,
+      rule_unreviewed: true,
+      unreviewed_days: 7,
+    },
+    isLoading: false,
+    isError: false,
+  }),
+  useSaveAlertSettings: () => ({ mutate: () => {}, isPending: false }),
+  useAlertChannels: () => ({ data: [], isLoading: false, isError: false }),
+  useCreateWebhookChannel: () => ({
+    mutateAsync: vi.fn<(...args: any[]) => any>(),
+    isPending: false,
+  }),
+  useSetAlertChannelEnabled: () => ({ mutate: () => {}, isPending: false }),
+  useDeleteAlertChannel: () => ({ mutate: () => {}, isPending: false }),
+  useTestAlertChannel: () => ({ mutateAsync: vi.fn<(...args: any[]) => any>(), isPending: false }),
+  useAlertEvents: () => ({ data: [], isLoading: false, isError: false }),
+}));
+
+vi.mock("../../lib/hooks/useOcrSettings", () => ({
+  useOcrSettings: () => ({
+    data: {
+      enabled: false,
+      base_url: "",
+      model: "",
+      api_key_set: false,
+      api_key_hint: "",
+      custom_prompt: "",
+      default_prompt: "",
+    },
+    isPending: false,
+    isError: false,
+  }),
+  useSaveOcrSettings: () => ({ mutateAsync: vi.fn<(...args: any[]) => any>(), isPending: false }),
+  useTestOcrSettings: () => ({ mutateAsync: vi.fn<(...args: any[]) => any>(), isPending: false }),
+  useListOcrModels: () => ({ mutateAsync: vi.fn<(...args: any[]) => any>(), isPending: false }),
+}));
+
+vi.mock("../../lib/hooks/useCoachSettings", () => ({
+  useCoachSettings: () => ({
+    data: {
+      enabled: false,
+      base_url: "",
+      model: "",
+      api_key_set: false,
+      api_key_hint: "",
+      custom_prompt: "",
+      default_prompt: "",
+    },
+    isPending: false,
+    isError: false,
+  }),
+  useSaveCoachSettings: () => ({ mutateAsync: vi.fn<(...args: any[]) => any>(), isPending: false }),
+  useTestCoachSettings: () => ({ mutateAsync: vi.fn<(...args: any[]) => any>(), isPending: false }),
+  useListCoachModels: () => ({ mutateAsync: vi.fn<(...args: any[]) => any>(), isPending: false }),
+}));
+
+const savePsychologyQuestions = vi.hoisted(() =>
+  vi.fn<(...args: any[]) => any>(async (body) => body),
+);
+
+vi.mock("../../lib/hooks/usePsychologyQuestions", () => ({
+  usePsychologyQuestions: () => ({
+    data: { questions: ["Am I calm?", "Am I following my plan?"] },
+    isPending: false,
+    isError: false,
+  }),
+  useSavePsychologyQuestions: () => ({
+    mutateAsync: savePsychologyQuestions,
+    isPending: false,
+  }),
+}));
+
+vi.mock("../../lib/hooks/useApiHealth", () => ({
+  useApiHealth: () => ({
+    data: { status: "ok", version: "0.1.0", go: "go1.26.1" },
+    isPending: false,
+    isSuccess: true,
+    isError: false,
+  }),
+}));
+
+vi.mock("../../lib/hooks/useSystemInfo", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../lib/hooks/useSystemInfo")>()),
+  useSystemInfo: () => ({
+    data: {
+      version: "0.1.0",
+      go: "go1.26.1",
+      started_at: "2026-01-01T00:00:00Z",
+      uptime_sec: 3600,
+      db_driver: "sqlite",
+      features: { econ_calendar: true },
+    },
+    isPending: false,
+    isSuccess: true,
+    isError: false,
+  }),
+}));
+
+// SettingsView reads `me` to decide whether the owner-only Users section
+// belongs in the nav. Everything else in this file renders without a
+// QueryClient, so the whole module is stubbed rather than provided for.
+vi.mock("../../lib/hooks/useMe", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../lib/hooks/useMe")>()),
+  useMe: () => ({
+    data: {
+      id: "u1",
+      email: "owner",
+      is_admin: true,
+      created_at: "2026-01-01T00:00:00Z",
+      totp_enabled: false,
+    },
+    isLoading: false,
+  }),
+}));
+
+vi.mock("../../lib/hooks/useAccessTokens", () => ({
+  useAccessTokens: () => ({
+    data: [],
+    isLoading: false,
+    isError: false,
+  }),
+  useCreateAccessToken: () => ({ mutateAsync: vi.fn<(...args: any[]) => any>(), isPending: false }),
+  useRevokeAccessToken: () => ({ mutateAsync: vi.fn<(...args: any[]) => any>(), isPending: false }),
+}));
+
+const noop = async () => {};
+
+const accounts: Account[] = [
+  {
+    id: "a1",
+    user_id: "u1",
+    name: "Main",
+    broker: "IBKR",
+    account_type: "margin",
+    base_currency: "USD",
+    starting_balance: 10000,
+    created_at: "2026-01-01T00:00:00Z",
+  },
+];
+
+const cashTransactions: CashTransaction[] = [
+  {
+    id: "c1",
+    user_id: "u1",
+    account_id: "a1",
+    type: "deposit",
+    amount: 10000,
+    currency: "USD",
+    occurred_at: "2026-01-01T00:00:00Z",
+    note: "Opening balance",
+    trade_id: null,
+    created_at: "2026-01-01T00:00:00Z",
+  },
+];
+const tags: Tag[] = [];
+
+const baseProps = {
+  accounts,
+  accountsLoading: false,
+  accountsError: false,
+  onCreateAccount: vi.fn<(...args: any[]) => any>(noop),
+  onDeleteAccount: vi.fn<(...args: any[]) => any>(noop),
+  onUpdateAccount: vi.fn<(...args: any[]) => any>(noop),
+  onClearAccountTrades: vi.fn<(...args: any[]) => any>(noop),
+
+  cashTransactions,
+  cashLoading: false,
+  cashError: false,
+  onCreateCash: vi.fn<(...args: any[]) => any>(noop),
+  onUpdateCash: vi.fn<(...args: any[]) => any>(noop),
+  onDeleteCash: vi.fn<(...args: any[]) => any>(noop),
+
+  tags,
+  tagsLoading: false,
+  tagsError: false,
+  onCreateTag: vi.fn<(...args: any[]) => any>(noop),
+  onUpdateTag: vi.fn<(...args: any[]) => any>(noop),
+  onDeleteTag: vi.fn<(...args: any[]) => any>(noop),
+
+  riskRules: {
+    max_risk_per_trade: null,
+    max_daily_loss: null,
+    max_open_risk: null,
+    default_account_risk_pct: null,
+    max_trades_per_day: null,
+    max_consecutive_losses: null,
+  },
+  riskRulesLoading: false,
+  riskRulesError: false,
+  riskRulesSaving: false,
+  onSaveRiskRules: vi.fn<(...args: any[]) => any>(noop),
+
+  annualGoal: { year: 2026, amount: null },
+  annualGoalLoading: false,
+  annualGoalError: false,
+  annualGoalSaving: false,
+  onSaveAnnualGoal: vi.fn<(...args: any[]) => any>(noop),
+  onClearAnnualGoal: vi.fn<(...args: any[]) => any>(noop),
+
+  checklistItems: ["Check VIX"],
+  checklistContent: "- [ ] Check VIX",
+  checklistLoading: false,
+  checklistError: false,
+  checklistSaving: false,
+  onSaveChecklist: vi.fn<(...args: any[]) => any>(noop),
+};
+
+describe("SettingsView", () => {
+  beforeEach(() => {
+    setStoredLocale(DEFAULT_LOCALE);
+    window.location.hash = "#accounts";
+    savePsychologyQuestions.mockClear();
+  });
+
+  it("marks the only account as primary and links to its detail page", async () => {
+    renderSettings({ ...baseProps });
+    expect(await screen.findByText("Primary")).toBeInTheDocument();
+    expect(screen.getAllByText("$10,000.00").length).toBeGreaterThan(0);
+    // Manage/delete now live on the account detail page the row links to.
+    expect(screen.getByRole("link", { name: /main/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /delete main/i })).not.toBeInTheDocument();
+  });
+
+  it("lists every account as a row linking to its detail page", () => {
+    const second: Account = {
+      ...accounts[0],
+      id: "a2",
+      name: "Paper",
+      created_at: "2026-02-01T00:00:00Z",
+    };
+    renderSettings({ ...baseProps, accounts: [...accounts, second] });
+    expect(screen.getByText("Primary")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /paper/i })).toBeInTheDocument();
+  });
+
+  it("opens the rules tab from the URL hash", () => {
+    window.location.hash = "#rules";
+    renderSettings({ ...baseProps });
+    expect(screen.getByText("Risk Rules")).toBeInTheDocument();
+  });
+
+  it("opens the AI tab from the URL hash", async () => {
+    window.location.hash = "#ai";
+    renderSettings({ ...baseProps });
+    expect(await screen.findByRole("heading", { name: /screenshot scan/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /trade coach/i })).toBeInTheDocument();
+  });
+
+  it("renders the language select on the general tab", async () => {
+    window.location.hash = "#general";
+    renderSettings({ ...baseProps });
+    expect(await screen.findByRole("combobox", { name: /language selector/i })).toBeInTheDocument();
+  });
+
+  it("shows all supported language options on the general tab", async () => {
+    window.location.hash = "#general";
+    renderSettings({ ...baseProps });
+    const select = await screen.findByRole("combobox", { name: /language selector/i });
+    expect(select).toHaveTextContent("English");
+    const options = Array.from((select as HTMLSelectElement).options).map((o) => o.textContent);
+    expect(options).toEqual(
+      expect.arrayContaining(["English", "繁體中文（香港）", "日本語", "한국어"]),
+    );
+  });
+
+  it("shows app config import/export actions on general tab", async () => {
+    window.location.hash = "#general";
+    renderSettings({ ...baseProps });
+    expect(await screen.findByRole("button", { name: /export config/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /import config/i })).toBeInTheDocument();
+  });
+
+  it("updates settings labels when language changes", async () => {
+    const user = userEvent.setup();
+    window.location.hash = "#general";
+    renderSettings({ ...baseProps });
+    const select = await screen.findByRole("combobox", { name: /language selector/i });
+    await user.selectOptions(select, "ja");
+    expect(await screen.findByRole("link", { name: /^一般$/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "一般", level: 1 })).toBeInTheDocument();
+    expect(screen.getByText("言語")).toBeInTheDocument();
+  });
+
+  it("opens the API tab from the URL hash", async () => {
+    window.location.hash = "#api";
+    renderSettings({ ...baseProps });
+    expect(await screen.findByRole("heading", { name: /api documentation/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /access tokens/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /open docs/i })).toBeInTheDocument();
+  });
+
+  it("shows empty state for cash when no transactions", async () => {
+    renderSettings({ ...baseProps, cashTransactions: [] });
+    expect(await screen.findByText("No transactions yet")).toBeInTheDocument();
+  });
+
+  it("opens cash form from add transaction action", async () => {
+    const user = userEvent.setup();
+    renderSettings({ ...baseProps });
+    await user.click(await screen.findByRole("button", { name: /add transaction/i }));
+    expect(screen.getByLabelText(/amount/i)).toBeInTheDocument();
+  });
+
+  it("shows empty state for tags when no tags", async () => {
+    const user = userEvent.setup();
+    renderSettings({ ...baseProps });
+    await user.click(screen.getByRole("link", { name: /^Journal$/i }));
+    expect(screen.getByText("No tags yet")).toBeInTheDocument();
+  });
+
+  it("saves editable psychology questions on the journal tab", async () => {
+    const user = userEvent.setup();
+    window.location.hash = "#journal";
+    renderSettings({ ...baseProps });
+
+    const question = await screen.findByLabelText("Psychology question 1");
+    await user.clear(question);
+    await user.type(question, "Did I wait for my setup?");
+    await user.click(screen.getByRole("button", { name: /save questions/i }));
+
+    expect(savePsychologyQuestions).toHaveBeenCalledWith({
+      questions: ["Did I wait for my setup?", "Am I following my plan?"],
+    });
+  });
+
+  it("renders the full risk-rule catalog on the rules tab", async () => {
+    const user = userEvent.setup();
+    renderSettings({ ...baseProps });
+    await user.click(screen.getByRole("link", { name: /^Rules$/i }));
+    expect(screen.getByText("Risk Rules")).toBeInTheDocument();
+    // Every rule from the catalog shows as a row with a Set affordance.
+    expect(screen.getByText("Max risk / trade")).toBeInTheDocument();
+    expect(screen.getByText("Max daily loss")).toBeInTheDocument();
+    expect(screen.getByText("Max open risk")).toBeInTheDocument();
+    expect(screen.getByText("Default account risk %")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Set Max risk / trade" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Set Default account risk %" })).toBeInTheDocument();
+    expect(screen.getByText("Annual P&L Goal")).toBeInTheDocument();
+    expect(screen.getByText("No annual goal yet")).toBeInTheDocument();
+  });
+
+  it("shows configured rule values and opens the set modal from a row", async () => {
+    const user = userEvent.setup();
+    renderSettings({
+      ...baseProps,
+      riskRules: {
+        max_risk_per_trade: 100,
+        max_daily_loss: null,
+        max_open_risk: null,
+        default_account_risk_pct: null,
+        max_trades_per_day: null,
+        max_consecutive_losses: null,
+      },
+    });
+    await user.click(screen.getByRole("link", { name: /^Rules$/i }));
+    expect(screen.getByText("$100")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Edit Max risk / trade" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Set Max daily loss" }));
+    expect(screen.getByRole("heading", { name: /set max daily loss/i })).toBeInTheDocument();
+    expect(screen.getByLabelText("Max daily loss")).toBeInTheDocument();
+  });
+
+  it("opens checklist editor in a modal on rules tab", async () => {
+    const user = userEvent.setup();
+    renderSettings({ ...baseProps });
+    await user.click(screen.getByRole("link", { name: /^Rules$/i }));
+    expect(screen.getByText("Daily Checklist")).toBeInTheDocument();
+    expect(screen.getByText("Check VIX")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/daily checklist and rules/i)).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /edit checklist/i }));
+    expect(screen.getByRole("heading", { name: /daily checklist/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/daily checklist and rules/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^save$/i })).toBeInTheDocument();
+  });
+
+  it("points journal setups to Playbook instead of duplicating CRUD", async () => {
+    const user = userEvent.setup();
+    renderSettings({ ...baseProps });
+    await user.click(screen.getByRole("link", { name: /^Journal$/i }));
+    expect(screen.getByRole("heading", { name: "Playbook setups", level: 2 })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /open playbook/i })).toHaveAttribute(
+      "href",
+      "/playbook",
+    );
+    expect(screen.queryByText("No setups yet")).not.toBeInTheDocument();
+  });
+
+  it("renders accounts section header", () => {
+    renderSettings({ ...baseProps });
+    expect(screen.getByRole("heading", { name: "Accounts", level: 2 })).toBeInTheDocument();
+  });
+
+  it("shows loading skeleton for accounts", () => {
+    const { container } = renderSettings({
+      ...baseProps,
+      accountsLoading: true,
+      accounts: [],
+    });
+    const skeletons = container.querySelectorAll('[aria-hidden="true"]');
+    expect(skeletons.length).toBeGreaterThan(0);
+  });
+
+  it("exposes bookmarkable section links", () => {
+    renderSettings({ ...baseProps });
+    expect(screen.getByRole("link", { name: /^Rules$/i })).toHaveAttribute("href", "#rules");
+    expect(screen.getByRole("link", { name: /^AI$/i })).toHaveAttribute("href", "#ai");
+    expect(screen.getByRole("link", { name: /^About$/i })).toHaveAttribute("href", "#about");
+  });
+
+  it("opens the about tab from the URL hash", async () => {
+    window.location.hash = "#about";
+    renderSettings({ ...baseProps });
+    expect(
+      await screen.findByRole("heading", { name: "TraderMemos", level: 2 }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/open-source performance journal/i)).toBeInTheDocument();
+    expect(screen.getByText("sinhong2011")).toBeInTheDocument();
+    expect(screen.getByText("Backend API")).toBeInTheDocument();
+    expect(screen.getByText("Updates")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /check for updates/i })).toBeInTheDocument();
+    expect(screen.getByText("Connected")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "GitHub repository" })).toHaveAttribute(
+      "href",
+      "https://github.com/sinhong2011/TraderMemos",
+    );
+    expect(screen.getAllByRole("link", { name: /github repository/i })).toHaveLength(2);
+  });
+});

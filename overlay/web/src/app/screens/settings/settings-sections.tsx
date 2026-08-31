@@ -1,0 +1,2419 @@
+import { useForm } from "@tanstack/react-form";
+import { Link } from "@tanstack/react-router";
+import type { LucideIcon } from "lucide-react";
+import {
+  Building2,
+  Brain,
+  ChevronRight,
+  Check,
+  Crosshair,
+  Download,
+  Hash,
+  Layers,
+  LogOut,
+  Pencil,
+  Percent,
+  Plus,
+  Repeat,
+  Target,
+  Tag,
+  TrendingDown,
+  Upload,
+  Wallet,
+  X,
+} from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { EmptyState } from "@/components/EmptyState";
+import { GoalProgressBar } from "@/components/GoalProgressBar";
+import { paceLabel, paceTone } from "@/components/AnnualGoalCard";
+import { LlmApiSettingsForm } from "@/components/LlmApiSettingsForm";
+import { ModeToggle } from "@/components/ModeToggle";
+import { Badge } from "@/components/reui/badge";
+import { flexSyncFailed } from "@/lib/api/flexSync";
+import { useFlexSyncConnections } from "@/lib/hooks/useFlexSync";
+import { ImportHistorySection } from "./import-history";
+import { Pill } from "@/components/Pill";
+import { Modal } from "@/components/Modal";
+import { AmountInput } from "@/components/AmountInput";
+import { DatePicker } from "@/components/DatePicker";
+import { RichTextEditor } from "@/components/RichTextEditor";
+import { fieldError, Field } from "@/components/Field";
+import { FormInput } from "@/components/FormInput";
+import { FormSkeleton } from "@/components/skeletons/form-skeleton";
+import { ListSkeleton } from "@/components/skeletons/list-skeleton";
+import { useToastManager } from "@/components/Toast";
+import { Button } from "@/components/ui/button";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { ApiError, editableApiBaseUrl, getCustomApiBaseUrl, setBaseUrl } from "@/lib/api/client";
+import { applyParsedAppConfig, buildAppConfigExport, parseAppConfig } from "@/lib/appConfig";
+import { computeAnnualGoalProgress, ytdFiltersForYear } from "@/lib/annualGoal";
+import { cn } from "@/lib/cn";
+import { useSummary } from "@/lib/hooks/useAnalytics";
+import type { AnnualGoal, RiskRules } from "@/lib/api/settings";
+import {
+  useCoachSettings,
+  useListCoachModels,
+  useSaveCoachSettings,
+  useTestCoachSettings,
+} from "@/lib/hooks/useCoachSettings";
+import type { Account, CashTransaction, Tag as TagType } from "@/lib/api/types";
+import { missingMistakePresets } from "@/lib/tagPresets";
+import {
+  useListOcrModels,
+  useOcrSettings,
+  useSaveOcrSettings,
+  useTestOcrSettings,
+} from "@/lib/hooks/useOcrSettings";
+import {
+  usePsychologyQuestions,
+  useSavePsychologyQuestions,
+} from "@/lib/hooks/usePsychologyQuestions";
+import { useTrades } from "@/lib/hooks/useTrades";
+import { formatCashDisplay, signedCashAmount } from "@/lib/cashAmount";
+import { parseAmountToNumber } from "@/lib/amountInput";
+import { fmtDate, fmtMoney, fmtSignedMoney } from "@/lib/format";
+import { intlLocale, LOCALE_OPTIONS, settingsLabel, type SettingsLabelKey } from "@/lib/locale";
+import type { LlmApiSettingsLabels } from "@/lib/llmApiSettings";
+import { useAuth } from "@/lib/auth";
+import { useJournalPrefs } from "@/lib/journalPrefs";
+import { useLocale } from "@/i18n";
+import {
+  TIME_FORMAT_OPTIONS,
+  TRADE_DATE_BASIS_OPTIONS,
+  marketTimezoneSelectOptions,
+  timezoneSelectOptions,
+  type MarketTimezonePref,
+  type TimeFormatPref,
+  type TimezonePref,
+  type TradeDateBasis,
+  usePrivacyMode,
+  useDisplayPrefs,
+} from "@/lib/displayPrefs";
+import {
+  RISK_RULE_DEFS,
+  defaultAccountFormValues,
+  defaultCashFormValues,
+  defaultTagFormValues,
+  formatRiskRuleValue,
+  parseRiskRuleValue,
+  riskRuleDef,
+  setRiskRuleValue,
+  validateAccountId,
+  validatePositiveAmount,
+  validateRequiredName,
+  validateRiskRuleValue,
+  validateStartingBalance,
+  type RiskRuleKey,
+} from "@/lib/settingsFormSchema";
+import {
+  BtnGhost,
+  BtnPrimary,
+  DeleteButton,
+  FormError,
+  SettingsCard,
+  SettingsCardNote,
+  SettingsCardRow,
+  SettingsInsetForm,
+  SettingsPanelBody,
+  SettingsGroup,
+  SettingsGroupRow,
+  SettingsRow,
+  SettingsSection,
+} from "./settings-ui";
+
+export function primaryAccountId(accounts: Account[]): string | undefined {
+  if (accounts.length === 0) return undefined;
+  return [...accounts].sort((a, b) => a.created_at.localeCompare(b.created_at))[0]?.id;
+}
+
+export function ledgerBalance(account: Account, transactions: CashTransaction[]) {
+  // Funded equity base is the cash ledger only. Opening balance is seeded as the
+  // first deposit when the account is created, so starting_balance is metadata.
+  return transactions
+    .filter((t) => t.account_id === account.id)
+    .reduce((sum, t) => sum + t.amount, 0);
+}
+
+export const POPULAR_BROKERS = [
+  "IBKR",
+  "Webull",
+  "Robinhood",
+  "Fidelity",
+  "Charles Schwab",
+  "E*TRADE",
+  "tastytrade",
+  "Moomoo",
+  "FUTU NIU NIU",
+] as const;
+export const OTHER_BROKER_VALUE = "__other__";
+
+const CASH_TYPE_OPTIONS = [
+  { value: "deposit", label: "Deposit" },
+  { value: "withdrawal", label: "Withdrawal" },
+  { value: "fee", label: "Fee" },
+  { value: "dividend", label: "Dividend" },
+  { value: "interest", label: "Interest" },
+  { value: "adjustment", label: "Adjustment" },
+] as const;
+
+// ---------------------------------------------------------------------------
+// Accounts & funding
+// ---------------------------------------------------------------------------
+
+export interface AccountsTabProps {
+  accounts: Account[];
+  accountsLoading: boolean;
+  accountsError: boolean;
+  onCreateAccount: (body: {
+    name: string;
+    broker: string;
+    account_type: string;
+    base_currency: string;
+    starting_balance: number;
+  }) => Promise<void>;
+  cashTransactions: CashTransaction[];
+  cashLoading: boolean;
+  cashError: boolean;
+  onCreateCash: (body: {
+    account_id: string;
+    type: string;
+    amount: number;
+    currency: string;
+    occurred_at: string;
+    note?: string;
+  }) => Promise<void>;
+  onUpdateCash: (
+    id: string,
+    body: {
+      type: string;
+      amount: number;
+      currency: string;
+      occurred_at: string;
+      note?: string;
+    },
+  ) => Promise<void>;
+  onDeleteCash: (id: string) => Promise<void>;
+}
+
+export function AccountsTab({
+  accounts,
+  accountsLoading,
+  accountsError,
+  onCreateAccount,
+  cashTransactions,
+  cashLoading,
+  cashError,
+  onCreateCash,
+  onUpdateCash,
+  onDeleteCash,
+}: AccountsTabProps) {
+  usePrivacyMode();
+  const toast = useToastManager();
+  // One request for all accounts' sync state: drives the per-row status pill
+  // and keeps the IBKR-sync affordance off accounts that have no connection.
+  const flexConnections = useFlexSyncConnections();
+  const connByAccount = new Map(
+    (flexConnections.data ?? []).map((conn) => [conn.account_id, conn]),
+  );
+  const [showAccountForm, setShowAccountForm] = useState(false);
+  const [showCashForm, setShowCashForm] = useState(false);
+  const [filterAccountId, setFilterAccountId] = useState<string | null>(null);
+  const [accountFormError, setAccountFormError] = useState<string | null>(null);
+  const [cashFormError, setCashFormError] = useState<string | null>(null);
+  const [editCashId, setEditCashId] = useState<string | null>(null);
+  const [editCashType, setEditCashType] = useState("deposit");
+  const [editCashAmount, setEditCashAmount] = useState("");
+  const [editCashDate, setEditCashDate] = useState("");
+  const [editCashNote, setEditCashNote] = useState("");
+  const [editCashCurrency, setEditCashCurrency] = useState("USD");
+  const [editCashError, setEditCashError] = useState<string | null>(null);
+  const [savingCash, setSavingCash] = useState(false);
+
+  const tradesQ = useTrades({});
+  const trades = tradesQ.data;
+  const primaryId = useMemo(() => primaryAccountId(accounts), [accounts]);
+  const tradeCountByAccount = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const trade of trades ?? []) {
+      counts.set(trade.account_id, (counts.get(trade.account_id) ?? 0) + 1);
+    }
+    return counts;
+  }, [trades]);
+  const netPnlByAccount = useMemo(() => {
+    const totals = new Map<string, number>();
+    for (const trade of trades ?? []) {
+      if (typeof trade.net_pnl !== "number") continue;
+      totals.set(trade.account_id, (totals.get(trade.account_id) ?? 0) + trade.net_pnl);
+    }
+    return totals;
+  }, [trades]);
+  async function handleDeleteCash(id: string) {
+    try {
+      await onDeleteCash(id);
+      toast.add({ title: "Transaction removed" });
+    } catch (err) {
+      toast.add({
+        title: "Could not remove transaction",
+        description: err instanceof Error ? err.message : "Request failed",
+      });
+    }
+  }
+
+  function startEditCash(tx: CashTransaction) {
+    setEditCashError(null);
+    setEditCashId(tx.id);
+    setEditCashType(tx.type);
+    setEditCashAmount(String(Math.abs(tx.amount)));
+    setEditCashDate(tx.occurred_at.slice(0, 10));
+    setEditCashNote(tx.note ?? "");
+    setEditCashCurrency(tx.currency || "USD");
+  }
+
+  function cancelEditCash() {
+    setEditCashId(null);
+    setEditCashError(null);
+    setSavingCash(false);
+  }
+
+  async function handleSaveCash() {
+    if (!editCashId) return;
+    const amount = parseAmountToNumber(editCashAmount);
+    if (amount == null || amount <= 0) {
+      setEditCashError("Enter a valid amount.");
+      return;
+    }
+    if (!editCashDate) {
+      setEditCashError("Date is required.");
+      return;
+    }
+    setSavingCash(true);
+    setEditCashError(null);
+    try {
+      await onUpdateCash(editCashId, {
+        type: editCashType,
+        amount: signedCashAmount(editCashType, amount),
+        currency: editCashCurrency || "USD",
+        occurred_at: new Date(`${editCashDate}T12:00:00.000Z`).toISOString(),
+        note: editCashNote.trim() || undefined,
+      });
+      toast.add({ title: "Transaction updated" });
+      cancelEditCash();
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : "Failed to update transaction.";
+      setEditCashError(message);
+      toast.add({ title: "Could not update transaction", description: message });
+      setSavingCash(false);
+    }
+  }
+
+  const accountForm = useForm({
+    formId: "settings-account",
+    defaultValues: defaultAccountFormValues(),
+    onSubmit: async ({ value }) => {
+      setAccountFormError(null);
+      try {
+        await onCreateAccount({
+          name: value.name.trim(),
+          broker: value.broker.trim(),
+          account_type: value.accountType,
+          base_currency: value.baseCurrency.trim() || "USD",
+          starting_balance: parseAmountToNumber(value.startingBalance) ?? 0,
+        });
+        accountForm.reset(defaultAccountFormValues());
+        setShowAccountForm(false);
+      } catch {
+        setAccountFormError("Failed to create account.");
+      }
+    },
+  });
+
+  const cashForm = useForm({
+    formId: "settings-cash",
+    defaultValues: defaultCashFormValues(accounts[0]?.id ?? ""),
+    onSubmit: async ({ value }) => {
+      const amt = parseAmountToNumber(value.amount);
+      if (amt == null) return;
+      const acct = accounts.find((a) => a.id === value.accountId);
+      setCashFormError(null);
+      try {
+        await onCreateCash({
+          account_id: value.accountId,
+          type: value.type,
+          amount: signedCashAmount(value.type, amt),
+          currency: acct?.base_currency ?? "USD",
+          occurred_at: `${value.occurredAt}T00:00:00Z`,
+          note: value.note.trim() || undefined,
+        });
+        cashForm.reset(defaultCashFormValues(accounts[0]?.id ?? ""));
+        setShowCashForm(false);
+      } catch {
+        setCashFormError("Failed to create transaction.");
+      }
+    },
+  });
+
+  useEffect(() => {
+    if (accounts[0]?.id && !cashForm.state.values.accountId) {
+      cashForm.setFieldValue("accountId", accounts[0].id);
+    }
+  }, [accounts, cashForm]);
+
+  function openCashForm() {
+    setCashFormError(null);
+    setFilterAccountId(null);
+    cashForm.reset(defaultCashFormValues(accounts[0]?.id ?? ""));
+    setShowCashForm(true);
+  }
+
+  function closeCashForm() {
+    setShowCashForm(false);
+    setCashFormError(null);
+    cashForm.reset(defaultCashFormValues(accounts[0]?.id ?? ""));
+  }
+
+  const sortedTx = useMemo(
+    () =>
+      [...cashTransactions].sort(
+        (a, b) => new Date(b.occurred_at).getTime() - new Date(a.occurred_at).getTime(),
+      ),
+    [cashTransactions],
+  );
+
+  const displayedTx = useMemo(() => {
+    if (!filterAccountId) return sortedTx;
+    return sortedTx.filter((tx) => tx.account_id === filterAccountId);
+  }, [filterAccountId, sortedTx]);
+
+  const filteredAccount = accounts.find((a) => a.id === filterAccountId);
+
+  return (
+    <>
+      <SettingsSection
+        title="Accounts"
+        description="Broker accounts used for trade grouping and filters."
+        action={
+          <BtnGhost
+            onClick={() => {
+              setAccountFormError(null);
+              accountForm.reset({
+                ...defaultAccountFormValues(),
+                broker: POPULAR_BROKERS[0],
+              });
+              setShowAccountForm(true);
+            }}
+          >
+            <Plus size={13} strokeWidth={1.5} />
+            Add account
+          </BtnGhost>
+        }
+      >
+        <Modal
+          open={showAccountForm}
+          onOpenChange={(open) => {
+            if (!open) {
+              setShowAccountForm(false);
+              setAccountFormError(null);
+              accountForm.reset(defaultAccountFormValues());
+            }
+          }}
+          title="Add account"
+          className="max-w-[min(500px,94vw)]"
+          footer={
+            <accountForm.Subscribe selector={(s) => s.isSubmitting}>
+              {(accountSaving) => (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setShowAccountForm(false);
+                      setAccountFormError(null);
+                      accountForm.reset(defaultAccountFormValues());
+                    }}
+                    disabled={accountSaving}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => void accountForm.handleSubmit()}
+                    disabled={accountSaving}
+                  >
+                    {accountSaving ? "Creating…" : "Create"}
+                  </Button>
+                </>
+              )}
+            </accountForm.Subscribe>
+          }
+        >
+          <form
+            className="flex flex-col gap-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void accountForm.handleSubmit();
+            }}
+          >
+            <accountForm.Field
+              name="name"
+              validators={{
+                onBlur: ({ value }) => validateRequiredName(value),
+                onSubmit: ({ value }) => validateRequiredName(value),
+              }}
+            >
+              {(field) => (
+                <Field
+                  label="Account name"
+                  htmlFor="acct-name"
+                  error={fieldError(field.state.meta.errors)}
+                >
+                  <FormInput
+                    id="acct-name"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    placeholder="e.g. Main Account"
+                    autoFocus
+                  />
+                </Field>
+              )}
+            </accountForm.Field>
+            <accountForm.Field
+              name="broker"
+              validators={{
+                onBlur: ({ value }) => (value.trim() ? undefined : "Broker is required."),
+                onSubmit: ({ value }) => (value.trim() ? undefined : "Broker is required."),
+              }}
+            >
+              {(field) => {
+                const brokerIsOther = !(POPULAR_BROKERS as readonly string[]).includes(
+                  field.state.value,
+                );
+                const brokerSelectValue = brokerIsOther ? OTHER_BROKER_VALUE : field.state.value;
+                return (
+                  <>
+                    <Field
+                      label="Broker"
+                      error={brokerIsOther ? undefined : fieldError(field.state.meta.errors)}
+                    >
+                      <NativeSelect
+                        id="acct-broker"
+                        value={brokerSelectValue}
+                        onChange={(e) => {
+                          const next = e.target.value;
+                          field.handleChange(next === OTHER_BROKER_VALUE ? "" : next);
+                        }}
+                        onBlur={field.handleBlur}
+                        aria-label="Broker"
+                        wrapperClassName="w-full"
+                      >
+                        {POPULAR_BROKERS.map((broker) => (
+                          <NativeSelectOption key={broker} value={broker}>
+                            {broker}
+                          </NativeSelectOption>
+                        ))}
+                        <NativeSelectOption value={OTHER_BROKER_VALUE}>Other</NativeSelectOption>
+                      </NativeSelect>
+                    </Field>
+                    {brokerSelectValue === OTHER_BROKER_VALUE ? (
+                      <Field
+                        label="Custom broker"
+                        htmlFor="acct-broker-other"
+                        error={fieldError(field.state.meta.errors)}
+                      >
+                        <FormInput
+                          id="acct-broker-other"
+                          value={field.state.value}
+                          onBlur={field.handleBlur}
+                          onChange={(e) => field.handleChange(e.target.value)}
+                          placeholder="Type broker name"
+                          autoFocus
+                        />
+                      </Field>
+                    ) : null}
+                  </>
+                );
+              }}
+            </accountForm.Field>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <accountForm.Field name="accountType">
+                {(field) => (
+                  <Field label="Account type">
+                    <NativeSelect
+                      value={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      aria-label="Account type"
+                      wrapperClassName="w-full"
+                    >
+                      <NativeSelectOption value="cash">Cash</NativeSelectOption>
+                      <NativeSelectOption value="margin">Margin</NativeSelectOption>
+                      <NativeSelectOption value="prop">Prop</NativeSelectOption>
+                      <NativeSelectOption value="backtest">Backtest (paper)</NativeSelectOption>
+                    </NativeSelect>
+                  </Field>
+                )}
+              </accountForm.Field>
+              <accountForm.Field name="baseCurrency">
+                {(field) => (
+                  <Field label="Base currency" htmlFor="acct-currency">
+                    <FormInput
+                      id="acct-currency"
+                      value={field.state.value}
+                      onBlur={field.handleBlur}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      placeholder="USD"
+                    />
+                  </Field>
+                )}
+              </accountForm.Field>
+              <accountForm.Field
+                name="startingBalance"
+                validators={{
+                  onBlur: ({ value }) => validateStartingBalance(value),
+                  onSubmit: ({ value }) => validateStartingBalance(value),
+                }}
+              >
+                {(field) => (
+                  <Field
+                    label="Starting balance"
+                    htmlFor="acct-balance"
+                    description="Saved as the first deposit in the cash ledger."
+                    error={fieldError(field.state.meta.errors)}
+                  >
+                    <AmountInput
+                      id="acct-balance"
+                      value={field.state.value}
+                      onValueChange={field.handleChange}
+                      onBlur={field.handleBlur}
+                      placeholder="0.00"
+                      allowNegative
+                    />
+                  </Field>
+                )}
+              </accountForm.Field>
+            </div>
+            <FormError message={accountFormError} />
+          </form>
+        </Modal>
+
+        {accountsLoading ? (
+          <SettingsPanelBody>
+            <ListSkeleton rows={3} />
+          </SettingsPanelBody>
+        ) : accountsError ? (
+          <SettingsPanelBody>
+            <p className="text-[12px] text-destructive">Failed to load accounts.</p>
+          </SettingsPanelBody>
+        ) : accounts.length === 0 ? (
+          <SettingsPanelBody className="py-8">
+            <EmptyState
+              title="No accounts yet"
+              hint="Start from your broker — we'll show you how to get the trades out of it."
+              icon={<Building2 size={28} strokeWidth={1.5} />}
+              actions={
+                <Button
+                  type="button"
+                  size="sm"
+                  render={<Link to="/connect" className="no-underline" />}
+                >
+                  <Building2 size={13} strokeWidth={1.5} />
+                  Connect broker
+                </Button>
+              }
+            />
+          </SettingsPanelBody>
+        ) : (
+          <>
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-2">
+                {accounts.map((acc) => {
+                  const balance = ledgerBalance(acc, cashTransactions);
+                  const isPrimary = acc.id === primaryId;
+                  const tradeCount = tradeCountByAccount.get(acc.id) ?? 0;
+                  const netPnl = netPnlByAccount.get(acc.id) ?? 0;
+                  const locale = intlLocale();
+                  const equity = balance + netPnl;
+                  const conn = connByAccount.get(acc.id);
+                  const metaParts = [
+                    acc.broker || null,
+                    acc.base_currency || null,
+                    tradeCount > 0
+                      ? `${tradeCount} ${tradeCount === 1 ? "trade" : "trades"}`
+                      : null,
+                  ].filter(Boolean);
+                  return (
+                    <Link
+                      key={acc.id}
+                      to="/accounts/$accountId"
+                      params={{ accountId: acc.id }}
+                      className="group flex items-center gap-3 rounded-lg border border-border px-4 py-3 no-underline transition-colors duration-150 hover:bg-accent/40 motion-reduce:transition-none"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                          <span className="truncate text-[14px] font-semibold tracking-tight text-foreground">
+                            {acc.name}
+                          </span>
+                          {isPrimary ? <Pill tone="amber">Primary</Pill> : null}
+                          {conn ? (
+                            <Badge
+                              variant={
+                                flexSyncFailed(conn)
+                                  ? "destructive-light"
+                                  : conn.enabled
+                                    ? "success-light"
+                                    : "secondary"
+                              }
+                            >
+                              {flexSyncFailed(conn)
+                                ? "Sync failing"
+                                : conn.enabled
+                                  ? "Sync on"
+                                  : "Sync off"}
+                            </Badge>
+                          ) : null}
+                        </div>
+                        <p className="m-0 mt-0.5 text-[12px] text-muted-foreground">
+                          {metaParts.join(" · ")}
+                        </p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p className="m-0 text-[14px] font-semibold tabular-nums tracking-tight text-foreground">
+                          {fmtMoney(equity, acc.base_currency, locale)}
+                        </p>
+                        <p
+                          className={cn(
+                            "m-0 text-[12px] font-medium tabular-nums",
+                            netPnl > 0
+                              ? "text-profit"
+                              : netPnl < 0
+                                ? "text-destructive"
+                                : "text-muted-foreground",
+                          )}
+                        >
+                          {fmtSignedMoney(netPnl, acc.base_currency, locale)}
+                        </p>
+                      </div>
+                      <ChevronRight
+                        size={16}
+                        strokeWidth={1.75}
+                        className="shrink-0 text-muted-foreground transition-transform duration-150 group-hover:translate-x-0.5 motion-reduce:transition-none"
+                      />
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          </>
+        )}
+      </SettingsSection>
+
+      <SettingsSection
+        id="settings-funding"
+        title="Deposits & withdrawals"
+        description="Track cash flows that affect your equity curve and header cash stat."
+        action={
+          <BtnGhost onClick={openCashForm}>
+            <Plus size={13} strokeWidth={1.5} />
+            Add transaction
+          </BtnGhost>
+        }
+      >
+        {filterAccountId && filteredAccount && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-md bg-card px-2 py-1 text-[11px] text-muted-foreground">
+              Filtered to {filteredAccount.name}
+            </span>
+            <BtnGhost className="px-2 py-1 text-[11px]" onClick={() => setFilterAccountId(null)}>
+              Show all
+            </BtnGhost>
+          </div>
+        )}
+        <Modal
+          open={showCashForm}
+          onOpenChange={(open) => {
+            if (!open) closeCashForm();
+          }}
+          title="Add transaction"
+          className="max-w-[min(500px,94vw)]"
+          footer={
+            <cashForm.Subscribe selector={(s) => s.isSubmitting}>
+              {(cashSaving) => (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={closeCashForm}
+                    disabled={cashSaving}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => void cashForm.handleSubmit()}
+                    disabled={cashSaving}
+                  >
+                    {cashSaving ? "Adding…" : "Add transaction"}
+                  </Button>
+                </>
+              )}
+            </cashForm.Subscribe>
+          }
+        >
+          <form
+            className="flex flex-col gap-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void cashForm.handleSubmit();
+            }}
+          >
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <cashForm.Field
+                name="accountId"
+                validators={{
+                  onSubmit: ({ value }) => validateAccountId(value),
+                }}
+              >
+                {(field) => (
+                  <Field label="Account" error={fieldError(field.state.meta.errors)}>
+                    <NativeSelect
+                      value={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      aria-label="Cash account"
+                      wrapperClassName="w-full"
+                    >
+                      {accounts.map((a) => (
+                        <NativeSelectOption key={a.id} value={a.id}>
+                          {a.name}
+                        </NativeSelectOption>
+                      ))}
+                    </NativeSelect>
+                  </Field>
+                )}
+              </cashForm.Field>
+              <cashForm.Field name="type">
+                {(field) => (
+                  <Field label="Type">
+                    <NativeSelect
+                      value={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      aria-label="Cash type"
+                      wrapperClassName="w-full"
+                    >
+                      {CASH_TYPE_OPTIONS.map(({ value, label }) => (
+                        <NativeSelectOption key={value} value={value}>
+                          {label}
+                        </NativeSelectOption>
+                      ))}
+                    </NativeSelect>
+                  </Field>
+                )}
+              </cashForm.Field>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <cashForm.Field
+                name="amount"
+                validators={{
+                  onBlur: ({ value }) => validatePositiveAmount(value),
+                  onSubmit: ({ value }) => validatePositiveAmount(value),
+                }}
+              >
+                {(field) => (
+                  <Field
+                    label="Amount"
+                    htmlFor="cash-amount"
+                    error={fieldError(field.state.meta.errors)}
+                  >
+                    <AmountInput
+                      id="cash-amount"
+                      value={field.state.value}
+                      onValueChange={field.handleChange}
+                      onBlur={field.handleBlur}
+                      placeholder="0.00"
+                      autoFocus
+                    />
+                  </Field>
+                )}
+              </cashForm.Field>
+              <cashForm.Field name="occurredAt">
+                {(field) => (
+                  <Field label="Date">
+                    <DatePicker
+                      aria-label="Date"
+                      value={field.state.value}
+                      onChange={field.handleChange}
+                      onBlur={field.handleBlur}
+                    />
+                  </Field>
+                )}
+              </cashForm.Field>
+            </div>
+            <cashForm.Field name="note">
+              {(field) => (
+                <Field label="Note" htmlFor="cash-note">
+                  <FormInput
+                    id="cash-note"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    placeholder="Optional note"
+                  />
+                </Field>
+              )}
+            </cashForm.Field>
+            <FormError message={cashFormError} />
+          </form>
+        </Modal>
+
+        {cashLoading ? (
+          <SettingsPanelBody>
+            <ListSkeleton rows={3} />
+          </SettingsPanelBody>
+        ) : cashError ? (
+          <SettingsPanelBody>
+            <p className="text-[12px] text-destructive">Failed to load transactions.</p>
+          </SettingsPanelBody>
+        ) : displayedTx.length === 0 ? (
+          <SettingsPanelBody className="py-8">
+            <EmptyState
+              title={filterAccountId ? "No transactions for this account" : "No transactions yet"}
+              hint={
+                filterAccountId
+                  ? "Record a deposit or withdrawal for this account."
+                  : "Add a deposit or withdrawal to track balance changes."
+              }
+              icon={<Wallet size={28} strokeWidth={1.5} />}
+            />
+          </SettingsPanelBody>
+        ) : (
+          <SettingsGroup>
+            {displayedTx.map((tx, index) => {
+              const acct = accounts.find((a) => a.id === tx.account_id);
+              const display = formatCashDisplay(tx.type, tx.amount, tx.currency);
+              const isOutflow = tx.amount < 0 || tx.type === "withdrawal" || tx.type === "fee";
+              return (
+                <SettingsRow
+                  key={tx.id}
+                  last={index === displayedTx.length - 1}
+                  primary={
+                    <span className="capitalize">
+                      {tx.type}
+                      {acct && (
+                        <span className="ml-2 font-normal text-muted-foreground">
+                          · {acct.name}
+                        </span>
+                      )}
+                    </span>
+                  }
+                  secondary={
+                    <>
+                      {fmtDate(tx.occurred_at)}
+                      {tx.note ? <span className="text-muted-foreground"> · {tx.note}</span> : null}
+                    </>
+                  }
+                  actions={
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className={`mr-1.5 text-[12px] font-semibold tabular-nums ${
+                          isOutflow ? "text-destructive" : "text-profit"
+                        }`}
+                      >
+                        {display}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-xs"
+                        tooltip={false}
+                        aria-label={`Edit ${tx.type} transaction`}
+                        onClick={() => startEditCash(tx)}
+                      >
+                        <Pencil size={14} strokeWidth={1.5} />
+                      </Button>
+                      <DeleteButton label={tx.type} onDelete={() => void handleDeleteCash(tx.id)} />
+                    </div>
+                  }
+                />
+              );
+            })}
+          </SettingsGroup>
+        )}
+      </SettingsSection>
+
+      <Modal
+        open={Boolean(editCashId)}
+        onOpenChange={(open) => {
+          if (!open) cancelEditCash();
+        }}
+        title="Edit transaction"
+        className="max-w-[min(440px,94vw)]"
+        footer={
+          <>
+            <Button type="button" variant="outline" onClick={cancelEditCash} disabled={savingCash}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={() => void handleSaveCash()} disabled={savingCash}>
+              {savingCash ? "Saving…" : "Save"}
+            </Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-3">
+          <Field label="Type">
+            <NativeSelect
+              value={editCashType}
+              onChange={(e) => setEditCashType(e.target.value)}
+              aria-label="Cash type"
+              wrapperClassName="w-full"
+            >
+              {CASH_TYPE_OPTIONS.map(({ value, label }) => (
+                <NativeSelectOption key={value} value={value}>
+                  {label}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+          </Field>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Field label="Amount" htmlFor="edit-cash-amount">
+              <AmountInput
+                id="edit-cash-amount"
+                value={editCashAmount}
+                onValueChange={setEditCashAmount}
+                placeholder="0.00"
+              />
+            </Field>
+            <Field label="Date">
+              <DatePicker aria-label="Date" value={editCashDate} onChange={setEditCashDate} />
+            </Field>
+          </div>
+          <Field label="Note" htmlFor="edit-cash-note">
+            <FormInput
+              id="edit-cash-note"
+              value={editCashNote}
+              onChange={(e) => setEditCashNote(e.target.value)}
+              placeholder="Optional note"
+            />
+          </Field>
+          <FormError message={editCashError} />
+        </div>
+      </Modal>
+      <ImportHistorySection accounts={accounts} />
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Rules
+// ---------------------------------------------------------------------------
+
+export interface RulesTabProps {
+  riskRules?: RiskRules;
+  riskRulesLoading: boolean;
+  riskRulesError: boolean;
+  riskRulesSaving: boolean;
+  onSaveRiskRules: (body: RiskRules) => Promise<void>;
+  annualGoal?: AnnualGoal;
+  annualGoalLoading: boolean;
+  annualGoalError: boolean;
+  annualGoalSaving: boolean;
+  onSaveAnnualGoal: (body: { year: number; amount: number }) => Promise<void>;
+  onClearAnnualGoal: (year: number) => Promise<void>;
+  checklistItems: string[];
+  checklistContent: string;
+  checklistLoading: boolean;
+  checklistError: boolean;
+  checklistSaving: boolean;
+  onSaveChecklist: (body: { items?: string[]; content: string }) => Promise<void>;
+}
+
+type RuleModalState = { open: false } | { open: true; mode: "set" | "edit"; key: RiskRuleKey };
+
+const RISK_RULE_ICONS: Record<RiskRuleKey, LucideIcon> = {
+  max_risk_per_trade: Crosshair,
+  max_daily_loss: TrendingDown,
+  max_open_risk: Layers,
+  max_trades_per_day: Hash,
+  max_consecutive_losses: Repeat,
+  default_account_risk_pct: Percent,
+};
+
+/** Bare counts read as orphans ("3") — count rules carry their unit word. */
+const RISK_RULE_COUNT_UNITS: Partial<Record<RiskRuleKey, string>> = {
+  max_trades_per_day: "trades",
+  max_consecutive_losses: "losses",
+};
+
+export function RulesTab({
+  riskRules,
+  riskRulesLoading,
+  riskRulesError,
+  riskRulesSaving,
+  onSaveRiskRules,
+  annualGoal,
+  annualGoalLoading,
+  annualGoalError,
+  annualGoalSaving,
+  onSaveAnnualGoal,
+  onClearAnnualGoal,
+  checklistItems,
+  checklistContent,
+  checklistLoading,
+  checklistError,
+  checklistSaving,
+  onSaveChecklist,
+}: RulesTabProps) {
+  usePrivacyMode();
+  const toast = useToastManager();
+  const locale = intlLocale();
+  const goalYear = annualGoal?.year ?? new Date().getFullYear();
+  const ytdFilters = useMemo(() => ytdFiltersForYear({}, goalYear), [goalYear]);
+  const ytdSummaryQ = useSummary(ytdFilters);
+  const [goalModalOpen, setGoalModalOpen] = useState(false);
+  const [goalDraft, setGoalDraft] = useState("");
+  const [goalError, setGoalError] = useState<string | null>(null);
+  const [ruleModal, setRuleModal] = useState<RuleModalState>({ open: false });
+  const [ruleValue, setRuleValue] = useState("");
+  const [ruleError, setRuleError] = useState<string | null>(null);
+
+  const [checklistDraft, setChecklistDraft] = useState(checklistContent);
+  const [checklistEditorKey, setChecklistEditorKey] = useState(0);
+  const [checklistModalOpen, setChecklistModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (checklistModalOpen) return;
+    setChecklistDraft(checklistContent);
+    setChecklistEditorKey((k) => k + 1);
+  }, [checklistContent, checklistModalOpen]);
+
+  const goalProgress =
+    annualGoal?.amount != null && annualGoal.amount > 0 && ytdSummaryQ.data != null
+      ? computeAnnualGoalProgress(annualGoal.amount, ytdSummaryQ.data.net_pnl, goalYear)
+      : null;
+
+  function closeRuleModal() {
+    setRuleModal({ open: false });
+    setRuleError(null);
+    setRuleValue("");
+  }
+
+  function openChecklistModal() {
+    setChecklistDraft(checklistContent);
+    setChecklistEditorKey((k) => k + 1);
+    setChecklistModalOpen(true);
+  }
+
+  function closeChecklistModal() {
+    if (checklistSaving) return;
+    setChecklistModalOpen(false);
+    setChecklistDraft(checklistContent);
+    setChecklistEditorKey((k) => k + 1);
+  }
+
+  function openSetRule(key: RiskRuleKey) {
+    setRuleValue("");
+    setRuleError(null);
+    setRuleModal({ open: true, mode: "set", key });
+  }
+
+  function openEditRule(key: RiskRuleKey, value: number) {
+    setRuleValue(String(value));
+    setRuleError(null);
+    setRuleModal({ open: true, mode: "edit", key });
+  }
+
+  async function persistRules(next: RiskRules, successTitle: string) {
+    try {
+      await onSaveRiskRules(next);
+      toast.add({ title: successTitle });
+      closeRuleModal();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Request failed";
+      setRuleError(message);
+      toast.add({ title: "Could not save risk rule", description: message });
+    }
+  }
+
+  async function handleSaveRule() {
+    if (!ruleModal.open) return;
+    const key = ruleModal.key;
+    const validation = validateRiskRuleValue(key, ruleValue);
+    if (validation) {
+      setRuleError(validation);
+      return;
+    }
+    const parsed = parseRiskRuleValue(key, ruleValue);
+    if (parsed == null) {
+      setRuleError("Enter a valid number.");
+      return;
+    }
+    setRuleError(null);
+    await persistRules(
+      setRiskRuleValue(riskRules, key, parsed),
+      ruleModal.mode === "edit" ? "Rule updated" : "Rule set",
+    );
+  }
+
+  async function handleDeleteRule(key: RiskRuleKey) {
+    try {
+      await onSaveRiskRules(setRiskRuleValue(riskRules, key, null));
+      toast.add({ title: "Rule removed", description: riskRuleDef(key).label });
+    } catch (err) {
+      toast.add({
+        title: "Could not remove rule",
+        description: err instanceof Error ? err.message : "Request failed",
+      });
+    }
+  }
+
+  async function handleSaveChecklist() {
+    try {
+      await onSaveChecklist({ content: checklistDraft });
+      toast.add({ title: "Checklist saved" });
+      setChecklistModalOpen(false);
+    } catch (err) {
+      toast.add({
+        title: "Could not save checklist",
+        description: err instanceof Error ? err.message : "Request failed",
+      });
+    }
+  }
+
+  function openGoalModal() {
+    setGoalDraft(annualGoal?.amount != null ? String(annualGoal.amount) : "");
+    setGoalError(null);
+    setGoalModalOpen(true);
+  }
+
+  function closeGoalModal() {
+    if (annualGoalSaving) return;
+    setGoalModalOpen(false);
+    setGoalError(null);
+  }
+
+  async function handleSaveGoal() {
+    const parsed = parseAmountToNumber(goalDraft);
+    if (parsed == null || parsed <= 0) {
+      setGoalError("Enter a goal greater than zero.");
+      return;
+    }
+    setGoalError(null);
+    try {
+      await onSaveAnnualGoal({ year: goalYear, amount: parsed });
+      toast.add({ title: "Annual goal saved" });
+      setGoalModalOpen(false);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Request failed";
+      setGoalError(message);
+      toast.add({ title: "Could not save annual goal", description: message });
+    }
+  }
+
+  async function handleClearGoal() {
+    try {
+      await onClearAnnualGoal(goalYear);
+      toast.add({ title: "Annual goal cleared" });
+      setGoalModalOpen(false);
+    } catch (err) {
+      toast.add({
+        title: "Could not clear annual goal",
+        description: err instanceof Error ? err.message : "Request failed",
+      });
+    }
+  }
+
+  const modalDef = ruleModal.open ? riskRuleDef(ruleModal.key) : null;
+  const modalTitle = modalDef
+    ? `${ruleModal.open && ruleModal.mode === "edit" ? "Edit" : "Set"} ${modalDef.label}`
+    : "";
+
+  return (
+    <>
+      <SettingsCard
+        title="Risk Rules"
+        description="Checked by Check compliance on New Trade. Only the limits you set are enforced."
+      >
+        {riskRulesLoading ? (
+          <div className="px-5 py-3">
+            <ListSkeleton rows={4} />
+          </div>
+        ) : riskRulesError ? (
+          <SettingsCardNote tone="destructive">Failed to load risk rules.</SettingsCardNote>
+        ) : (
+          RISK_RULE_DEFS.map((def) => {
+            const value = riskRules?.[def.key];
+            return (
+              <SettingsCardRow
+                key={def.key}
+                icon={RISK_RULE_ICONS[def.key]}
+                active={value != null}
+                label={def.label}
+                detail={def.detail}
+              >
+                {value != null ? (
+                  <>
+                    <Button
+                      type="button"
+                      variant="soft"
+                      size="sm"
+                      aria-label={`Edit ${def.label}`}
+                      disabled={riskRulesSaving}
+                      onClick={() => openEditRule(def.key, value)}
+                      className="gap-1.5"
+                    >
+                      <span className="font-semibold tabular-nums text-foreground">
+                        {formatRiskRuleValue(def.key, value, locale)}
+                        {RISK_RULE_COUNT_UNITS[def.key] ? (
+                          <span className="ml-1 font-normal text-muted-foreground">
+                            {RISK_RULE_COUNT_UNITS[def.key]}
+                          </span>
+                        ) : null}
+                      </span>
+                      <Pencil
+                        size={12}
+                        strokeWidth={1.5}
+                        aria-hidden
+                        className="text-muted-foreground"
+                      />
+                    </Button>
+                    <DeleteButton
+                      label={def.label}
+                      disabled={riskRulesSaving}
+                      onDelete={() => void handleDeleteRule(def.key)}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <span className="text-[12px] text-muted-foreground/70">Off</span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      aria-label={`Set ${def.label}`}
+                      disabled={riskRulesSaving}
+                      onClick={() => openSetRule(def.key)}
+                    >
+                      Set
+                    </Button>
+                  </>
+                )}
+              </SettingsCardRow>
+            );
+          })
+        )}
+      </SettingsCard>
+
+      <SettingsCard
+        title="Annual P&L Goal"
+        description={`Net P&L target for ${goalYear}. Progress shows here and on Home and Reports.`}
+      >
+        {annualGoalLoading ? (
+          <div className="px-5 py-3">
+            <ListSkeleton rows={1} />
+          </div>
+        ) : annualGoalError ? (
+          <SettingsCardNote tone="destructive">Failed to load annual goal.</SettingsCardNote>
+        ) : annualGoal?.amount == null ? (
+          <SettingsCardRow
+            icon={Target}
+            label="No annual goal yet"
+            detail="Set a net P&L target for the year — progress appears on Home and Reports."
+          >
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              aria-label="Set annual goal"
+              disabled={annualGoalSaving}
+              onClick={openGoalModal}
+            >
+              Set goal
+            </Button>
+          </SettingsCardRow>
+        ) : (
+          <>
+            <SettingsCardRow
+              icon={Target}
+              active
+              label={`${goalYear} target`}
+              detail="User-level net P&L goal — respects the account filter on Home and Reports."
+            >
+              <Button
+                type="button"
+                variant="soft"
+                size="sm"
+                aria-label="Edit annual goal"
+                disabled={annualGoalSaving}
+                onClick={openGoalModal}
+                className="gap-1.5"
+              >
+                <span className="font-semibold tabular-nums text-foreground">
+                  {fmtMoney(annualGoal.amount, "USD", locale)}
+                </span>
+                <Pencil size={12} strokeWidth={1.5} aria-hidden className="text-muted-foreground" />
+              </Button>
+              <DeleteButton
+                label="annual goal"
+                disabled={annualGoalSaving}
+                onDelete={() => void handleClearGoal()}
+              />
+            </SettingsCardRow>
+            {goalProgress ? (
+              <div className="flex flex-col gap-2 px-5 pb-2 pt-1 sm:pl-[70px]">
+                <GoalProgressBar
+                  progress={goalProgress.progress}
+                  className="h-3"
+                  aria-label="Annual goal progress"
+                />
+                <p className="m-0 text-[12px] text-muted-foreground">
+                  <span
+                    className={cn(
+                      "font-medium tabular-nums",
+                      goalProgress.ytdNetPnl > 0
+                        ? "text-profit"
+                        : goalProgress.ytdNetPnl < 0
+                          ? "text-destructive"
+                          : "text-muted-foreground",
+                    )}
+                  >
+                    {fmtSignedMoney(goalProgress.ytdNetPnl, "USD", locale)}
+                  </span>{" "}
+                  YTD ·{" "}
+                  <span className="tabular-nums">{Math.round(goalProgress.progressPct)}%</span> of
+                  goal ·{" "}
+                  <span className={paceTone(goalProgress.paceStatus)}>
+                    {paceLabel(goalProgress.paceStatus)}
+                  </span>
+                </p>
+              </div>
+            ) : null}
+          </>
+        )}
+      </SettingsCard>
+
+      <SettingsCard
+        title="Daily Checklist"
+        description="Trading rules for New Note — task items appear when you create a daily log."
+        action={
+          checklistItems.length > 0 || checklistContent.trim() ? (
+            <BtnGhost
+              onClick={openChecklistModal}
+              disabled={checklistLoading || checklistError}
+              aria-label="Edit checklist"
+            >
+              <Pencil size={13} strokeWidth={1.5} />
+              Edit
+            </BtnGhost>
+          ) : undefined
+        }
+      >
+        {checklistLoading ? (
+          <div className="px-5 py-3">
+            <ListSkeleton rows={3} />
+          </div>
+        ) : checklistError ? (
+          <SettingsCardNote tone="destructive">Failed to load checklist template.</SettingsCardNote>
+        ) : checklistItems.length === 0 && !checklistContent.trim() ? (
+          <SettingsCardRow
+            icon={Check}
+            label="No checklist yet"
+            detail="Add rules and - [ ] items — they show up on New Note."
+          >
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              aria-label="Edit checklist"
+              onClick={openChecklistModal}
+            >
+              Create checklist
+            </Button>
+          </SettingsCardRow>
+        ) : checklistItems.length > 0 ? (
+          <div className="flex flex-col px-5 py-1">
+            {checklistItems.map((item, index) => (
+              <div key={`${item}-${index}`} className="flex items-center gap-3 py-1.5">
+                <span
+                  aria-hidden
+                  className="size-4 shrink-0 rounded-[4px] border-[1.5px] border-muted-foreground/35"
+                />
+                <span className="min-w-0 text-[13px] text-foreground">{item}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <SettingsCardNote>
+            Checklist text saved — add <code className="text-primary">- [ ]</code> items so they
+            appear on New Note.
+          </SettingsCardNote>
+        )}
+      </SettingsCard>
+
+      <Modal
+        open={checklistModalOpen}
+        onOpenChange={(open) => {
+          if (!open) closeChecklistModal();
+        }}
+        title="Daily checklist"
+        className="max-w-[min(560px,94vw)]"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={closeChecklistModal}
+              disabled={checklistSaving}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void handleSaveChecklist()}
+              disabled={checklistSaving}
+            >
+              {checklistSaving ? "Saving…" : "Save"}
+            </Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-3">
+          <RichTextEditor
+            key={checklistEditorKey}
+            value={checklistDraft}
+            onChange={setChecklistDraft}
+            placeholder={"- [ ] Check VIX\n- [ ] No revenge trades\n- [ ] Size within risk rules"}
+            minHeight={220}
+            showHints
+            aria-label="Daily checklist and rules"
+          />
+          <p className="text-[11px] text-muted-foreground">
+            Tip: use checklist buttons or type <code className="text-primary">- [ ]</code> for each
+            rule.
+          </p>
+        </div>
+      </Modal>
+
+      <Modal
+        open={ruleModal.open}
+        onOpenChange={(open) => {
+          if (!open) closeRuleModal();
+        }}
+        title={modalTitle}
+        className="max-w-[min(440px,94vw)]"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={closeRuleModal}
+              disabled={riskRulesSaving}
+            >
+              Cancel
+            </Button>
+            <Button type="button" disabled={riskRulesSaving} onClick={() => void handleSaveRule()}>
+              {riskRulesSaving
+                ? "Saving…"
+                : ruleModal.open && ruleModal.mode === "edit"
+                  ? "Save"
+                  : "Set rule"}
+            </Button>
+          </>
+        }
+      >
+        {modalDef ? (
+          <div className="flex flex-col gap-3">
+            <p className="m-0 text-[12px] leading-relaxed text-muted-foreground">
+              {modalDef.detail}
+            </p>
+            <Field
+              label={
+                modalDef.unit === "%"
+                  ? "Value (%)"
+                  : modalDef.unit === "count"
+                    ? "Value (trades)"
+                    : "Value ($)"
+              }
+              htmlFor="risk-rule-value"
+              error={ruleError ?? undefined}
+            >
+              <AmountInput
+                id="risk-rule-value"
+                value={ruleValue}
+                onValueChange={(v) => {
+                  setRuleValue(v);
+                  if (ruleError) setRuleError(null);
+                }}
+                placeholder={modalDef.placeholder}
+                aria-label={modalDef.label}
+                className="w-full"
+                autoFocus
+              />
+            </Field>
+          </div>
+        ) : null}
+      </Modal>
+
+      <Modal
+        open={goalModalOpen}
+        onOpenChange={(open) => {
+          if (!open) closeGoalModal();
+        }}
+        title={`${goalYear} P&L goal`}
+        className="max-w-[min(440px,94vw)]"
+        footer={
+          <div className="flex w-full items-center justify-between gap-2">
+            {annualGoal?.amount != null ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={annualGoalSaving}
+                onClick={() => void handleClearGoal()}
+                className="text-destructive hover:text-destructive"
+              >
+                Clear
+              </Button>
+            ) : (
+              <span />
+            )}
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={closeGoalModal}
+                disabled={annualGoalSaving}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                disabled={annualGoalSaving}
+                onClick={() => void handleSaveGoal()}
+              >
+                {annualGoalSaving ? "Saving…" : "Save goal"}
+              </Button>
+            </div>
+          </div>
+        }
+      >
+        <div className="flex flex-col gap-3">
+          <Field
+            label="Target net P&L ($)"
+            htmlFor="annual-goal-amount"
+            error={goalError ?? undefined}
+          >
+            <AmountInput
+              id="annual-goal-amount"
+              value={goalDraft}
+              onValueChange={(v) => {
+                setGoalDraft(v);
+                if (goalError) setGoalError(null);
+              }}
+              placeholder="100000"
+              aria-label="Annual P&L goal amount"
+              className="w-full"
+            />
+          </Field>
+          <p className="m-0 text-[12px] leading-relaxed text-muted-foreground">
+            Progress uses calendar-year net P&L and appears on Home and Reports.
+          </p>
+        </div>
+      </Modal>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Journal (tags)
+// ---------------------------------------------------------------------------
+
+export interface JournalTabProps {
+  tags: TagType[];
+  tagsLoading: boolean;
+  tagsError: boolean;
+  onCreateTag: (body: { name: string; color?: string; kind?: string }) => Promise<void>;
+  onUpdateTag: (
+    id: string,
+    body: { name: string; color: string; description: string; kind: string },
+  ) => Promise<void>;
+  onDeleteTag: (id: string) => Promise<void>;
+}
+
+export function JournalTab({
+  tags,
+  tagsLoading,
+  tagsError,
+  onCreateTag,
+  onUpdateTag,
+  onDeleteTag,
+}: JournalTabProps) {
+  const toast = useToastManager();
+  const psychology = usePsychologyQuestions();
+  const savePsychology = useSavePsychologyQuestions();
+  const [showTagForm, setShowTagForm] = useState(false);
+  const [tagFormError, setTagFormError] = useState<string | null>(null);
+  const [addingPresets, setAddingPresets] = useState(false);
+  const [questionDrafts, setQuestionDrafts] = useState<string[]>([]);
+  const [questionError, setQuestionError] = useState<string | null>(null);
+  const suggestedMistakes = missingMistakePresets(tags);
+
+  useEffect(() => {
+    if (psychology.data) {
+      setQuestionDrafts(psychology.data.questions.length > 0 ? psychology.data.questions : [""]);
+    }
+  }, [psychology.data]);
+
+  /** Sequential, not parallel — the API rejects duplicate names and we want per-name failures. */
+  async function addMistakePresets(names: string[]) {
+    setAddingPresets(true);
+    const added: string[] = [];
+    try {
+      for (const name of names) {
+        try {
+          // Same default the manual create form uses — recolour per tag afterwards.
+          await onCreateTag({ name, color: defaultTagFormValues().color, kind: "mistake" });
+          added.push(name);
+        } catch {
+          // Already taken under a different kind — skip rather than abort the batch.
+        }
+      }
+    } finally {
+      setAddingPresets(false);
+    }
+    toast.add(
+      added.length
+        ? { title: `Added ${added.length} mistake type${added.length === 1 ? "" : "s"}` }
+        : { title: "Nothing to add", description: "Those names are already in use." },
+    );
+  }
+
+  async function changeTagKind(tag: TagType, kind: string) {
+    try {
+      await onUpdateTag(tag.id, {
+        name: tag.name,
+        color: tag.color,
+        description: tag.description,
+        kind,
+      });
+    } catch (err) {
+      toast.add({
+        title: "Could not change tag kind",
+        description: err instanceof Error ? err.message : "Request failed",
+      });
+    }
+  }
+
+  const tagForm = useForm({
+    formId: "settings-tag",
+    defaultValues: defaultTagFormValues(),
+    onSubmit: async ({ value }) => {
+      setTagFormError(null);
+      try {
+        await onCreateTag({
+          name: value.name.trim(),
+          color: value.color,
+          kind: value.kind,
+        });
+        tagForm.reset(defaultTagFormValues());
+        setShowTagForm(false);
+      } catch {
+        setTagFormError("Failed to create tag.");
+      }
+    },
+  });
+
+  async function handleDeleteTag(id: string) {
+    const name = tags.find((tag) => tag.id === id)?.name ?? "Tag";
+    try {
+      await onDeleteTag(id);
+      toast.add({ title: "Tag deleted", description: name });
+    } catch (err) {
+      toast.add({
+        title: "Could not delete tag",
+        description: err instanceof Error ? err.message : "Request failed",
+      });
+    }
+  }
+
+  function updateQuestion(index: number, value: string) {
+    setQuestionError(null);
+    setQuestionDrafts((items) => items.map((item, i) => (i === index ? value : item)));
+  }
+
+  function addQuestion() {
+    setQuestionError(null);
+    setQuestionDrafts((items) => [...items, ""]);
+  }
+
+  function deleteQuestion(index: number) {
+    setQuestionError(null);
+    setQuestionDrafts((items) => {
+      const next = items.filter((_, i) => i !== index);
+      return next.length > 0 ? next : [""];
+    });
+  }
+
+  async function saveQuestions() {
+    const questions = questionDrafts.map((q) => q.trim()).filter(Boolean);
+    setQuestionError(null);
+    try {
+      await savePsychology.mutateAsync({ questions });
+      toast.add({ title: "Psychology questions saved" });
+      setQuestionDrafts(questions.length > 0 ? questions : [""]);
+    } catch (err) {
+      setQuestionError(err instanceof Error ? err.message : "Failed to save questions.");
+    }
+  }
+
+  return (
+    <>
+      <SettingsSection
+        title="Psychology questions"
+        description="Add the reflection prompts you want to answer before or after a trade."
+        action={
+          <BtnGhost onClick={addQuestion}>
+            <Plus size={13} strokeWidth={1.5} />
+            Add question
+          </BtnGhost>
+        }
+      >
+        {psychology.isPending && !psychology.data ? (
+          <SettingsPanelBody>
+            <ListSkeleton rows={3} />
+          </SettingsPanelBody>
+        ) : psychology.isError ? (
+          <SettingsPanelBody>
+            <p className="text-[12px] text-destructive">Failed to load psychology questions.</p>
+          </SettingsPanelBody>
+        ) : (
+          <SettingsPanelBody>
+            <div className="flex flex-col gap-3">
+              {questionDrafts.length === 0 ? (
+                <EmptyState
+                  title="No questions yet"
+                  hint="Add simple text prompts for your trading psychology review."
+                  icon={<Brain size={28} strokeWidth={1.5} />}
+                />
+              ) : (
+                questionDrafts.map((question, index) => (
+                  <div key={index} className="flex items-start gap-2">
+                    <FormInput
+                      value={question}
+                      onChange={(e) => updateQuestion(index, e.target.value)}
+                      placeholder="e.g. Am I trading my plan or reacting emotionally?"
+                      aria-label={`Psychology question ${index + 1}`}
+                      className="min-w-0 flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => deleteQuestion(index)}
+                      aria-label={`Delete psychology question ${index + 1}`}
+                      className="shrink-0 text-muted-foreground hover:text-destructive"
+                    >
+                      <X size={14} strokeWidth={1.75} aria-hidden />
+                    </Button>
+                  </div>
+                ))
+              )}
+              <FormError message={questionError} />
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="m-0 text-[12px] text-muted-foreground">
+                  These prompts will be reused by the guided trade workflow.
+                </p>
+                <BtnPrimary onClick={() => void saveQuestions()} loading={savePsychology.isPending}>
+                  <Check size={12} strokeWidth={1.5} />
+                  {savePsychology.isPending ? "Saving…" : "Save questions"}
+                </BtnPrimary>
+              </div>
+            </div>
+          </SettingsPanelBody>
+        )}
+      </SettingsSection>
+
+      <SettingsSection
+        title="Tags"
+        description="Annotate trades with mistakes, habits, and custom labels."
+        action={
+          <BtnGhost active={showTagForm} onClick={() => setShowTagForm((v) => !v)}>
+            <Plus size={13} strokeWidth={1.5} />
+            Add tag
+          </BtnGhost>
+        }
+      >
+        {showTagForm && (
+          <SettingsInsetForm>
+            <form
+              className="flex flex-col gap-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void tagForm.handleSubmit();
+              }}
+            >
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <tagForm.Field
+                  name="name"
+                  validators={{
+                    onBlur: ({ value }) => validateRequiredName(value),
+                    onSubmit: ({ value }) => validateRequiredName(value),
+                  }}
+                >
+                  {(field) => (
+                    <Field
+                      label="Name"
+                      htmlFor="tag-name"
+                      error={fieldError(field.state.meta.errors)}
+                    >
+                      <FormInput
+                        id="tag-name"
+                        value={field.state.value}
+                        onBlur={field.handleBlur}
+                        onChange={(e) => field.handleChange(e.target.value)}
+                        placeholder="e.g. FOMO"
+                      />
+                    </Field>
+                  )}
+                </tagForm.Field>
+                <tagForm.Field name="color">
+                  {(field) => (
+                    <Field label="Color" htmlFor="tag-color">
+                      <input
+                        id="tag-color"
+                        type="color"
+                        value={field.state.value}
+                        onChange={(e) => field.handleChange(e.target.value)}
+                        className="h-8 w-full cursor-pointer rounded-md border-none bg-muted p-0.5"
+                      />
+                    </Field>
+                  )}
+                </tagForm.Field>
+                <tagForm.Field name="kind">
+                  {(field) => (
+                    <Field label="Kind">
+                      <NativeSelect
+                        size="sm"
+                        value={field.state.value}
+                        onChange={(e) => field.handleChange(e.target.value)}
+                        aria-label="Tag kind"
+                        className="h-8 w-full text-[12px]"
+                        wrapperClassName="w-full"
+                      >
+                        <NativeSelectOption value="custom">Custom</NativeSelectOption>
+                        <NativeSelectOption value="mistake">Mistake</NativeSelectOption>
+                      </NativeSelect>
+                    </Field>
+                  )}
+                </tagForm.Field>
+              </div>
+              <FormError message={tagFormError} />
+              <div className="flex items-center gap-2">
+                <tagForm.Subscribe selector={(s) => s.isSubmitting}>
+                  {(tagSaving) => (
+                    <BtnPrimary type="submit" loading={tagSaving}>
+                      <Check size={12} strokeWidth={1.5} />
+                      {tagSaving ? "Creating…" : "Create"}
+                    </BtnPrimary>
+                  )}
+                </tagForm.Subscribe>
+                <BtnGhost
+                  onClick={() => {
+                    setShowTagForm(false);
+                    setTagFormError(null);
+                    tagForm.reset(defaultTagFormValues());
+                  }}
+                >
+                  <X size={12} strokeWidth={1.5} />
+                  Cancel
+                </BtnGhost>
+              </div>
+            </form>
+          </SettingsInsetForm>
+        )}
+
+        {/*
+         * Mistake types are just tags, so a journal starts with none and the
+         * New Trade form hides the picker until at least one exists. Offering
+         * the vocabulary here beats seeding it — nothing appears in someone's
+         * journal unless they ask for it.
+         */}
+        {!tagsLoading && !tagsError && suggestedMistakes.length > 0 && (
+          <SettingsPanelBody>
+            <div className="flex flex-col gap-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="m-0 text-[12px] text-muted-foreground">
+                  Suggested mistake types — these fill the trade form's Mistake type picker.
+                </p>
+                <BtnGhost
+                  disabled={addingPresets}
+                  onClick={() => void addMistakePresets(suggestedMistakes)}
+                >
+                  <Plus size={13} strokeWidth={1.5} />
+                  {addingPresets ? "Adding…" : "Add all"}
+                </BtnGhost>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {suggestedMistakes.map((name) => (
+                  <Button
+                    key={name}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={addingPresets}
+                    onClick={() => void addMistakePresets([name])}
+                    aria-label={`Add mistake type ${name}`}
+                    className="h-7 gap-1 rounded-md px-2 text-[12px] font-normal"
+                  >
+                    <Plus size={12} strokeWidth={1.5} aria-hidden />
+                    {name}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          </SettingsPanelBody>
+        )}
+
+        {tagsLoading ? (
+          <SettingsPanelBody>
+            <ListSkeleton rows={3} />
+          </SettingsPanelBody>
+        ) : tagsError ? (
+          <SettingsPanelBody>
+            <p className="text-[12px] text-destructive">Failed to load tags.</p>
+          </SettingsPanelBody>
+        ) : tags.length === 0 ? (
+          <SettingsPanelBody className="py-8">
+            <EmptyState
+              title="No tags yet"
+              hint="Create tags to annotate your trades."
+              icon={<Tag size={28} strokeWidth={1.5} />}
+            />
+          </SettingsPanelBody>
+        ) : (
+          <SettingsGroup>
+            {tags.map((tag, index) => (
+              <SettingsRow
+                key={tag.id}
+                last={index === tags.length - 1}
+                primary={
+                  <span className="inline-flex items-center gap-2">
+                    <span
+                      className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
+                      style={{ background: tag.color || "#6366f1" }}
+                    />
+                    {tag.name}
+                  </span>
+                }
+                secondary={
+                  tag.kind === "mistake"
+                    ? "Offered in the trade form's Mistake type picker."
+                    : "Offered in the trade form's Tags picker."
+                }
+                actions={
+                  <>
+                    {/*
+                     * Kind is editable here because it decides which picker the
+                     * tag shows up in, and the create form defaults to Custom —
+                     * without this the only way to re-file a tag is delete and
+                     * recreate, which orphans it on every trade already tagged.
+                     */}
+                    <NativeSelect
+                      size="sm"
+                      value={tag.kind === "mistake" ? "mistake" : "custom"}
+                      onChange={(e) => void changeTagKind(tag, e.target.value)}
+                      aria-label={`Kind for ${tag.name}`}
+                      className="h-8 text-[12px]"
+                    >
+                      <NativeSelectOption value="custom">Custom</NativeSelectOption>
+                      <NativeSelectOption value="mistake">Mistake</NativeSelectOption>
+                    </NativeSelect>
+                    <DeleteButton label={tag.name} onDelete={() => void handleDeleteTag(tag.id)} />
+                  </>
+                }
+              />
+            ))}
+          </SettingsGroup>
+        )}
+      </SettingsSection>
+
+      <SettingsSection
+        title="Playbook setups"
+        description="Manage thesis, checklist, and performance on the Playbook page — not here."
+      >
+        <SettingsPanelBody>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="m-0 max-w-xl text-[12px] leading-relaxed text-muted-foreground">
+              Setups are created and edited in Playbook, then linked when you log a trade.
+            </p>
+            <Button type="button" variant="outline" render={<a href="/playbook" />}>
+              Open Playbook
+            </Button>
+          </div>
+        </SettingsPanelBody>
+      </SettingsSection>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// AI & LLM
+// ---------------------------------------------------------------------------
+
+function llmApiLabels(locale: string, prefix: "vision" | "coach"): LlmApiSettingsLabels {
+  const key = (suffix: string) => settingsLabel(locale, `${prefix}${suffix}` as SettingsLabelKey);
+  return {
+    enabled: key("Enabled"),
+    enabledDetail: settingsLabel(locale, "llmEnabledDetail"),
+    off: key("Off"),
+    on: key("On"),
+    baseUrl: key("BaseUrl"),
+    baseUrlDetail: settingsLabel(locale, "llmBaseUrlDetail"),
+    model: key("Model"),
+    modelDetail: settingsLabel(locale, "llmModelDetail"),
+    fetchModels: key("FetchModels"),
+    fetchingModels: key("FetchingModels"),
+    apiKey: key("ApiKey"),
+    apiKeyHint: key("ApiKeyHint"),
+    apiKeyDetail: settingsLabel(locale, "llmApiKeyDetail"),
+    customPrompt: prefix === "coach" ? key("CustomPrompt") : key("CustomPrompt"),
+    customPromptHint: key("CustomPromptHint"),
+    save: key("Save"),
+    test: key("Test"),
+    testing: key("Testing"),
+  };
+}
+
+function VisionScanSection() {
+  const { locale } = useLocale();
+  const { data, isPending, isError } = useOcrSettings();
+  const save = useSaveOcrSettings();
+  const test = useTestOcrSettings();
+  const listModels = useListOcrModels();
+
+  return (
+    <SettingsSection
+      title={settingsLabel(locale, "visionScan")}
+      footer={settingsLabel(locale, "visionScanFooter")}
+    >
+      {isPending && !data ? (
+        <SettingsPanelBody>
+          <FormSkeleton fields={3} />
+        </SettingsPanelBody>
+      ) : isError || !data ? (
+        <SettingsPanelBody>
+          <p className="text-[12px] text-destructive">Failed to load vision settings.</p>
+        </SettingsPanelBody>
+      ) : (
+        <LlmApiSettingsForm
+          settings={data}
+          labels={llmApiLabels(locale, "vision")}
+          saveErrorMessage="Could not save vision settings."
+          onSave={(body) => save.mutateAsync(body)}
+          onTest={(body) => test.mutateAsync(body)}
+          onListModels={(body) => listModels.mutateAsync(body)}
+        />
+      )}
+    </SettingsSection>
+  );
+}
+
+function CoachSection() {
+  const { locale } = useLocale();
+  const { data, isPending, isError } = useCoachSettings();
+  const save = useSaveCoachSettings();
+  const test = useTestCoachSettings();
+  const listModels = useListCoachModels();
+
+  return (
+    <SettingsSection
+      title={settingsLabel(locale, "coachTitle")}
+      footer={settingsLabel(locale, "coachFooter")}
+    >
+      {isPending && !data ? (
+        <SettingsPanelBody>
+          <FormSkeleton fields={3} />
+        </SettingsPanelBody>
+      ) : isError || !data ? (
+        <SettingsPanelBody>
+          <p className="text-[12px] text-destructive">Failed to load coach settings.</p>
+        </SettingsPanelBody>
+      ) : (
+        <LlmApiSettingsForm
+          settings={data}
+          labels={llmApiLabels(locale, "coach")}
+          saveErrorMessage="Could not save coach settings."
+          onSave={(body) => save.mutateAsync(body)}
+          onTest={(body) => test.mutateAsync(body)}
+          onListModels={(body) => listModels.mutateAsync(body)}
+        />
+      )}
+    </SettingsSection>
+  );
+}
+
+export function AiTab() {
+  return (
+    <>
+      <VisionScanSection />
+      <CoachSection />
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// General
+// ---------------------------------------------------------------------------
+
+export function GeneralTab() {
+  const { locale, setLocale } = useLocale();
+  const toast = useToastManager();
+  const signOut = useAuth((s) => s.signOut);
+  const maxScreenshots = useJournalPrefs((s) => s.maxScreenshotsPerTrade);
+  const setMaxScreenshots = useJournalPrefs((s) => s.setMaxScreenshotsPerTrade);
+  const timezone = useDisplayPrefs((s) => s.timezone);
+  const setTimezone = useDisplayPrefs((s) => s.setTimezone);
+  const marketTimezone = useDisplayPrefs((s) => s.marketTimezone);
+  const setMarketTimezone = useDisplayPrefs((s) => s.setMarketTimezone);
+  const timeFormat = useDisplayPrefs((s) => s.timeFormat);
+  const setTimeFormat = useDisplayPrefs((s) => s.setTimeFormat);
+  const tradeDateBasis = useDisplayPrefs((s) => s.tradeDateBasis);
+  const setTradeDateBasis = useDisplayPrefs((s) => s.setTradeDateBasis);
+  const [serverUrl, setServerUrl] = useState(() => editableApiBaseUrl(getCustomApiBaseUrl()));
+  const configInputRef = useRef<HTMLInputElement | null>(null);
+
+  function handleExportConfig() {
+    const payload = buildAppConfigExport(locale, getCustomApiBaseUrl());
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const stamp = new Date().toISOString().slice(0, 10);
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `tradermemos-app-config-${stamp}.json`;
+    link.rel = "noopener";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    toast.add({
+      title: "App config exported",
+      description: "Downloaded your local app preferences as JSON.",
+    });
+  }
+
+  async function handleImportConfig(file: File) {
+    try {
+      const parsed = parseAppConfig(await file.text());
+      await applyParsedAppConfig(parsed, setLocale);
+      setServerUrl(editableApiBaseUrl(getCustomApiBaseUrl()));
+      toast.add({
+        title: "App config imported",
+        description: "Settings restored from backup.",
+      });
+    } catch (err) {
+      toast.add({
+        title: "Could not import config",
+        description: err instanceof Error ? err.message : "Invalid config file.",
+      });
+    }
+  }
+
+  return (
+    <>
+      <SettingsSection description={settingsLabel(locale, "syncedPrefsNote")}>
+        <SettingsGroup>
+          <SettingsGroupRow
+            label={settingsLabel(locale, "language")}
+            detail={settingsLabel(locale, "languageFooter")}
+          >
+            <NativeSelect
+              value={locale}
+              onChange={(e) => {
+                void setLocale(e.target.value as typeof locale);
+              }}
+              aria-label={settingsLabel(locale, "languageSelector")}
+              className="w-full"
+              wrapperClassName="w-full"
+            >
+              {LOCALE_OPTIONS.map((o) => (
+                <NativeSelectOption key={o.value} value={o.value}>
+                  {o.label}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+          </SettingsGroupRow>
+          <SettingsGroupRow
+            label={settingsLabel(locale, "theme")}
+            detail={settingsLabel(locale, "themeFooter")}
+          >
+            <ModeToggle
+              labels={{
+                themeLight: settingsLabel(locale, "themeLight"),
+                themeDark: settingsLabel(locale, "themeDark"),
+                themeSystem: settingsLabel(locale, "themeSystem"),
+                themeSelector: settingsLabel(locale, "themeSelector"),
+              }}
+              className="w-full"
+              wrapperClassName="w-full"
+            />
+          </SettingsGroupRow>
+          <SettingsGroupRow
+            label={settingsLabel(locale, "timezone")}
+            detail={settingsLabel(locale, "timezoneFooter")}
+            alignTop
+          >
+            <NativeSelect
+              value={timezone}
+              onChange={(e) => setTimezone(e.target.value as TimezonePref)}
+              aria-label={settingsLabel(locale, "timezoneSelector")}
+              className="w-full"
+              wrapperClassName="w-full"
+            >
+              {timezoneSelectOptions().map((o) => (
+                <NativeSelectOption key={o.value} value={o.value}>
+                  {o.label}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+          </SettingsGroupRow>
+          <SettingsGroupRow
+            label={settingsLabel(locale, "marketTimezone")}
+            detail={settingsLabel(locale, "marketTimezoneFooter")}
+            alignTop
+          >
+            <NativeSelect
+              value={marketTimezone}
+              onChange={(e) => setMarketTimezone(e.target.value as MarketTimezonePref)}
+              aria-label={settingsLabel(locale, "marketTimezoneSelector")}
+              className="w-full"
+              wrapperClassName="w-full"
+            >
+              {marketTimezoneSelectOptions().map((o) => (
+                <NativeSelectOption key={o.value} value={o.value}>
+                  {o.label}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+          </SettingsGroupRow>
+          <SettingsGroupRow
+            label={settingsLabel(locale, "timeFormat")}
+            detail={settingsLabel(locale, "timeFormatFooter")}
+          >
+            <NativeSelect
+              value={timeFormat}
+              onChange={(e) => setTimeFormat(e.target.value as TimeFormatPref)}
+              aria-label={settingsLabel(locale, "timeFormatSelector")}
+              className="w-full"
+              wrapperClassName="w-full"
+            >
+              {TIME_FORMAT_OPTIONS.map((o) => (
+                <NativeSelectOption key={o.value} value={o.value}>
+                  {o.label}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+          </SettingsGroupRow>
+          <SettingsGroupRow
+            label={settingsLabel(locale, "tradeDateBasis")}
+            detail={settingsLabel(locale, "tradeDateBasisFooter")}
+          >
+            <NativeSelect
+              value={tradeDateBasis}
+              onChange={(e) => setTradeDateBasis(e.target.value as TradeDateBasis)}
+              aria-label={settingsLabel(locale, "tradeDateBasisSelector")}
+              className="w-full"
+              wrapperClassName="w-full"
+            >
+              {TRADE_DATE_BASIS_OPTIONS.map((o) => (
+                <NativeSelectOption key={o.value} value={o.value}>
+                  {o.value === "close"
+                    ? settingsLabel(locale, "tradeDateBasisClose")
+                    : settingsLabel(locale, "tradeDateBasisOpen")}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+          </SettingsGroupRow>
+          <SettingsGroupRow
+            label={settingsLabel(locale, "maxScreenshots")}
+            detail={settingsLabel(locale, "screenshotsFooter")}
+          >
+            <FormInput
+              type="number"
+              min={1}
+              max={100}
+              inputMode="numeric"
+              placeholder={settingsLabel(locale, "maxScreenshotsHint")}
+              aria-label={settingsLabel(locale, "maxScreenshots")}
+              value={maxScreenshots ?? ""}
+              onChange={(e) => {
+                const raw = e.target.value.trim();
+                if (raw === "") {
+                  setMaxScreenshots(null);
+                  return;
+                }
+                setMaxScreenshots(Number(raw));
+              }}
+              className="h-10 w-full text-[13px]"
+            />
+          </SettingsGroupRow>
+          <SettingsGroupRow
+            label={settingsLabel(locale, "serverUrl")}
+            detail={settingsLabel(locale, "serverUrlFooter")}
+            alignTop
+          >
+            <FormInput
+              type="text"
+              inputMode="url"
+              spellCheck={false}
+              placeholder={settingsLabel(locale, "serverUrlHint")}
+              aria-label={settingsLabel(locale, "serverUrl")}
+              value={serverUrl}
+              onChange={(e) => setServerUrl(e.target.value)}
+              onBlur={() => {
+                setBaseUrl(serverUrl);
+                setServerUrl(editableApiBaseUrl(getCustomApiBaseUrl()));
+              }}
+              className="h-10 w-full text-[13px]"
+            />
+          </SettingsGroupRow>
+          <SettingsGroupRow
+            label={settingsLabel(locale, "session")}
+            detail={settingsLabel(locale, "signOutFooter")}
+          >
+            <Button type="button" variant="outline" onClick={() => signOut()}>
+              <LogOut size={14} strokeWidth={1.75} aria-hidden />
+              {settingsLabel(locale, "signOut")}
+            </Button>
+          </SettingsGroupRow>
+          <SettingsGroupRow
+            label={settingsLabel(locale, "appConfig")}
+            detail={settingsLabel(locale, "appConfigFooter")}
+            last
+          >
+            <div className="flex w-full flex-wrap justify-end gap-2">
+              <Button type="button" variant="outline" onClick={handleExportConfig}>
+                <Download size={13} strokeWidth={1.5} />
+                {settingsLabel(locale, "exportConfig")}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => configInputRef.current?.click()}
+              >
+                <Upload size={13} strokeWidth={1.5} />
+                {settingsLabel(locale, "importConfig")}
+              </Button>
+              <input
+                ref={configInputRef}
+                type="file"
+                accept="application/json,.json"
+                className="hidden"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) void handleImportConfig(file);
+                  event.currentTarget.value = "";
+                }}
+              />
+            </div>
+          </SettingsGroupRow>
+        </SettingsGroup>
+      </SettingsSection>
+    </>
+  );
+}
