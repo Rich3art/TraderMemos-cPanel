@@ -42,12 +42,12 @@ string AccountMetricsJson()
    payload += "\"mt_account_login\":\"" + IntegerToString((int)AccountInfoInteger(ACCOUNT_LOGIN)) + "\",";
    payload += "\"mt_broker\":\"" + JsonEscape(AccountInfoString(ACCOUNT_COMPANY)) + "\",";
    payload += "\"account_currency\":\"" + JsonEscape(AccountInfoString(ACCOUNT_CURRENCY)) + "\",";
-   payload += "\"account_balance\":" + DoubleToString(AccountInfoDouble(ACCOUNT_BALANCE), 2) + ",";
-   payload += "\"account_equity\":" + DoubleToString(AccountInfoDouble(ACCOUNT_EQUITY), 2) + ",";
-   payload += "\"account_margin\":" + DoubleToString(AccountInfoDouble(ACCOUNT_MARGIN), 2) + ",";
-   payload += "\"account_free_margin\":" + DoubleToString(AccountInfoDouble(ACCOUNT_MARGIN_FREE), 2) + ",";
-   payload += "\"account_margin_level\":" + DoubleToString(AccountInfoDouble(ACCOUNT_MARGIN_LEVEL), 2) + ",";
-   payload += "\"account_leverage\":" + IntegerToString((int)AccountInfoInteger(ACCOUNT_LEVERAGE));
+   payload += "\"account_balance\":\"" + DoubleToString(AccountInfoDouble(ACCOUNT_BALANCE), 2) + "\",";
+   payload += "\"account_equity\":\"" + DoubleToString(AccountInfoDouble(ACCOUNT_EQUITY), 2) + "\",";
+   payload += "\"account_margin\":\"" + DoubleToString(AccountInfoDouble(ACCOUNT_MARGIN), 2) + "\",";
+   payload += "\"account_free_margin\":\"" + DoubleToString(AccountInfoDouble(ACCOUNT_MARGIN_FREE), 2) + "\",";
+   payload += "\"account_margin_level\":\"" + DoubleToString(AccountInfoDouble(ACCOUNT_MARGIN_LEVEL), 2) + "\",";
+   payload += "\"account_leverage\":\"" + IntegerToString((int)AccountInfoInteger(ACCOUNT_LEVERAGE)) + "\"";
    return payload;
 }
 

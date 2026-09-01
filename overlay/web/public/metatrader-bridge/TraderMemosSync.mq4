@@ -42,11 +42,11 @@ string AccountMetricsJson()
    payload += "\"mt_account_login\":\"" + IntegerToString(AccountNumber()) + "\",";
    payload += "\"mt_broker\":\"" + JsonEscape(AccountCompany()) + "\",";
    payload += "\"account_currency\":\"" + JsonEscape(AccountCurrency()) + "\",";
-   payload += "\"account_balance\":" + DoubleToString(AccountBalance(), 2) + ",";
-   payload += "\"account_equity\":" + DoubleToString(AccountEquity(), 2) + ",";
-   payload += "\"account_margin\":" + DoubleToString(AccountMargin(), 2) + ",";
-   payload += "\"account_free_margin\":" + DoubleToString(AccountFreeMargin(), 2) + ",";
-   payload += "\"account_leverage\":" + IntegerToString(AccountLeverage());
+   payload += "\"account_balance\":\"" + DoubleToString(AccountBalance(), 2) + "\",";
+   payload += "\"account_equity\":\"" + DoubleToString(AccountEquity(), 2) + "\",";
+   payload += "\"account_margin\":\"" + DoubleToString(AccountMargin(), 2) + "\",";
+   payload += "\"account_free_margin\":\"" + DoubleToString(AccountFreeMargin(), 2) + "\",";
+   payload += "\"account_leverage\":\"" + IntegerToString(AccountLeverage()) + "\"";
    return payload;
 }
 
