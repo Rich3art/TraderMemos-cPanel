@@ -49,7 +49,7 @@ jobs:
         env:
           CGO_ENABLED: "0"
         run: |
-          go test ./internal/marketdata ./internal/api
+          go test ./internal/analytics ./internal/marketdata
           go build -ldflags "-s -w" -o ../../artifact/bin/server ./cmd/server
           go build -ldflags "-s -w" -o ../../artifact/bin/tradermemos ./cmd/cli
 
