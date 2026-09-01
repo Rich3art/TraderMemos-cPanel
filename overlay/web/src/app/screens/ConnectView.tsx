@@ -227,7 +227,10 @@ function BrokerSetup({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [synced, setSynced] = useState<{ inserted: number; skipped: number } | null>(null);
-  const [bridgeAccountId, setBridgeAccountId] = useState<string | null>(null);
+  const [bridgeAccountId, setBridgeAccountId] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    return window.localStorage.getItem("tradermemos.bridge.accountId");
+  });
 
   // Connect and manage used to be two surfaces that didn't know about each
   // other: revisiting /connect on an already-connected account showed a blank
@@ -320,6 +323,7 @@ function BrokerSetup({
   function handlePrepareBridge() {
     void run(async (accountId) => {
       setBridgeAccountId(accountId);
+      window.localStorage.setItem("tradermemos.bridge.accountId", accountId);
       toast.add({ title: "MetaTrader bridge ready", description: "Install the MT4 or MT5 file." });
     });
   }

@@ -1,7 +1,7 @@
 // TraderMemosSync.mq5
 // Attach this Expert Advisor to any MT5 chart to send filled deals to TraderMemos.
 #property strict
-#property version "1.00"
+#property version "1.10"
 
 input string TraderMemosServer = "https://journal.ranksmedia.com";
 input string TraderMemosToken = "";
@@ -9,6 +9,8 @@ input string TraderMemosAccountId = "";
 input int SyncSeconds = 60;
 input int LookbackDays = 365;
 input int ServerUtcOffsetHours = 2;
+input bool PrintSyncMessages = true;
+input bool ResetSyncState = false;
 
 string StateKey()
 {
@@ -20,6 +22,33 @@ string JsonEscape(string value)
    StringReplace(value, "\\", "\\\\");
    StringReplace(value, "\"", "\\\"");
    return value;
+}
+
+void Log(string message)
+{
+   if(PrintSyncMessages) Print("TraderMemosSync: " + message);
+}
+
+string ResponseText(uchar &result[])
+{
+   string text = CharArrayToString(result, 0, ArraySize(result), CP_UTF8);
+   if(StringLen(text) > 260) text = StringSubstr(text, 0, 260) + "...";
+   return text;
+}
+
+string AccountMetricsJson()
+{
+   string payload = "";
+   payload += "\"mt_account_login\":\"" + IntegerToString((int)AccountInfoInteger(ACCOUNT_LOGIN)) + "\",";
+   payload += "\"mt_broker\":\"" + JsonEscape(AccountInfoString(ACCOUNT_COMPANY)) + "\",";
+   payload += "\"account_currency\":\"" + JsonEscape(AccountInfoString(ACCOUNT_CURRENCY)) + "\",";
+   payload += "\"account_balance\":" + DoubleToString(AccountInfoDouble(ACCOUNT_BALANCE), 2) + ",";
+   payload += "\"account_equity\":" + DoubleToString(AccountInfoDouble(ACCOUNT_EQUITY), 2) + ",";
+   payload += "\"account_margin\":" + DoubleToString(AccountInfoDouble(ACCOUNT_MARGIN), 2) + ",";
+   payload += "\"account_free_margin\":" + DoubleToString(AccountInfoDouble(ACCOUNT_MARGIN_FREE), 2) + ",";
+   payload += "\"account_margin_level\":" + DoubleToString(AccountInfoDouble(ACCOUNT_MARGIN_LEVEL), 2) + ",";
+   payload += "\"account_leverage\":" + IntegerToString((int)AccountInfoInteger(ACCOUNT_LEVERAGE));
+   return payload;
 }
 
 string IsoUtc(datetime value)
@@ -52,11 +81,11 @@ double MultiplierFor(string symbol, string instrument)
    return 1.0;
 }
 
-bool PostExecution(ulong ticket)
+int PostExecution(ulong ticket)
 {
    string symbol = HistoryDealGetString(ticket, DEAL_SYMBOL);
    long type = HistoryDealGetInteger(ticket, DEAL_TYPE);
-   if(symbol == "" || (type != DEAL_TYPE_BUY && type != DEAL_TYPE_SELL)) return true;
+   if(symbol == "" || (type != DEAL_TYPE_BUY && type != DEAL_TYPE_SELL)) return 0;
 
    string instrument = InstrumentType(symbol);
    string side = type == DEAL_TYPE_BUY ? "buy" : "sell";
@@ -77,31 +106,50 @@ bool PostExecution(ulong ticket)
    payload += "\"commission\":" + DoubleToString(commission, 8) + ",";
    payload += "\"executed_at\":\"" + IsoUtc(executedAt) + "\",";
    payload += "\"multiplier\":" + DoubleToString(MultiplierFor(symbol, instrument), 2) + ",";
-   payload += "\"details\":{\"source\":\"metatrader5\",\"ticket\":\"" + IntegerToString((long)ticket) + "\"}";
+   payload += "\"details\":{\"source\":\"metatrader5\",\"ticket\":\"" + IntegerToString((long)ticket) + "\"," + AccountMetricsJson() + "}";
    payload += "}";
 
    uchar body[];
-   StringToCharArray(payload, body, 0, WHOLE_ARRAY, CP_UTF8);
+   int bytes = StringToCharArray(payload, body, 0, WHOLE_ARRAY, CP_UTF8);
+   if(bytes > 0) ArrayResize(body, bytes - 1);
    uchar result[];
    string resultHeaders;
    string headers = "Content-Type: application/json\r\nAuthorization: Bearer " + TraderMemosToken + "\r\n";
    string url = TraderMemosServer + "/api/v1/executions";
+   ResetLastError();
    int status = WebRequest("POST", url, headers, 10000, body, result, resultHeaders);
-   return status == 200 || status == 201 || status == 409;
+   if(status == 201)
+   {
+      Log("synced MT5 deal " + IntegerToString((long)ticket) + " " + symbol + " " + side + " balance=" + DoubleToString(AccountInfoDouble(ACCOUNT_BALANCE), 2) + " equity=" + DoubleToString(AccountInfoDouble(ACCOUNT_EQUITY), 2) + " margin=" + DoubleToString(AccountInfoDouble(ACCOUNT_MARGIN), 2));
+      return 1;
+   }
+   if(status == 200 || status == 409)
+   {
+      Log("deal already in journal " + IntegerToString((long)ticket) + " (HTTP " + IntegerToString(status) + ")");
+      return 2;
+   }
+   if(status == -1)
+   {
+      int error = GetLastError();
+      Log("WebRequest failed for deal " + IntegerToString((long)ticket) + " with error " + IntegerToString(error) + ". In MT5 add " + TraderMemosServer + " under Tools > Options > Expert Advisors > Allow WebRequest.");
+      return -1;
+   }
+   Log("server rejected deal " + IntegerToString((long)ticket) + " with HTTP " + IntegerToString(status) + ": " + ResponseText(result));
+   return -1;
 }
 
 void SyncHistory()
 {
    if(TraderMemosToken == "" || TraderMemosAccountId == "")
    {
-      Print("TraderMemosSync: token and account id are required.");
+      Log("token and account id are required.");
       return;
    }
 
    datetime from = TimeCurrent() - LookbackDays * 86400;
    if(!HistorySelect(from, TimeCurrent()))
    {
-      Print("TraderMemosSync: HistorySelect failed.");
+      Log("HistorySelect failed.");
       return;
    }
 
@@ -110,17 +158,34 @@ void SyncHistory()
 
    ulong newestOk = lastTicket;
    int total = HistoryDealsTotal();
+   int attempted = 0;
+   int synced = 0;
+   int duplicates = 0;
+   int failed = 0;
    for(int i = 0; i < total; i++)
    {
       ulong ticket = HistoryDealGetTicket(i);
       if(ticket <= lastTicket) continue;
-      if(PostExecution(ticket) && ticket > newestOk) newestOk = ticket;
+      int result = PostExecution(ticket);
+      if(result == 0) continue;
+      attempted++;
+      if(result == 1) synced++;
+      if(result == 2) duplicates++;
+      if(result < 0) failed++;
+      if(result > 0 && ticket > newestOk) newestOk = ticket;
    }
    if(newestOk > lastTicket) GlobalVariableSet(StateKey(), (double)newestOk);
+   Log("history check complete: deals=" + IntegerToString(total) + ", attempted=" + IntegerToString(attempted) + ", synced=" + IntegerToString(synced) + ", already_present=" + IntegerToString(duplicates) + ", failed=" + IntegerToString(failed));
 }
 
 int OnInit()
 {
+   if(ResetSyncState && GlobalVariableCheck(StateKey()))
+   {
+      GlobalVariableDel(StateKey());
+      Log("sync state reset; old deals in the lookback window will be checked again.");
+   }
+   Log("started for MT5 login " + IntegerToString((int)AccountInfoInteger(ACCOUNT_LOGIN)) + " using server " + TraderMemosServer + " and journal account " + TraderMemosAccountId);
    EventSetTimer(MathMax(15, SyncSeconds));
    SyncHistory();
    return INIT_SUCCEEDED;
