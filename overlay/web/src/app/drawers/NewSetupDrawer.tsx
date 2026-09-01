@@ -1,6 +1,6 @@
 import { useForm } from "@tanstack/react-form";
 import { X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import {
   Drawer,
   DrawerBody,
@@ -25,7 +25,6 @@ import { Button } from "@/components/ui/button";
 import { parseAmountToNumber } from "@/lib/amountInput";
 import { setupsApi } from "@/lib/api/setups";
 import type { BarInterval } from "@/lib/api/market";
-import { TradeChart } from "@/components/charts/TradeChart";
 import { capScreenshots, useJournalPrefs } from "@/lib/journalPrefs";
 import {
   useCreateSetup,
@@ -58,6 +57,9 @@ const EMPTY_VALUES = {
 
 const SETUP_CHART_INTERVAL: BarInterval = "240";
 const SETUP_CHART_LOOKBACK_MS = 180 * 86_400_000;
+const SetupTradeChart = lazy(() =>
+  import("@/components/charts/TradeChart").then((m) => ({ default: m.TradeChart })),
+);
 
 function valuesFromDraft(draft: NonNullable<ReturnType<typeof useUI.getState>["setupDraft"]>) {
   return {
@@ -101,20 +103,22 @@ function SetupSymbolChart({
 
   return (
     <div className="rounded-lg bg-card p-3">
-      <TradeChart
-        symbol={cleanSymbol}
-        bars={barsQ.data?.bars}
-        fills={[]}
-        loading={barsQ.isLoading}
-        error={barsQ.isError}
-        errorMessage={barsQ.error instanceof Error ? barsQ.error.message : undefined}
-        targetPrice={parseAmountToNumber(target)}
-        stopPrice={parseAmountToNumber(stop)}
-        interval={SETUP_CHART_INTERVAL}
-        height={260}
-        hideHeaderLabel
-        drawingTools
-      />
+      <Suspense fallback={<div className="h-[260px] rounded-lg bg-muted" aria-label="Loading setup chart" />}>
+        <SetupTradeChart
+          symbol={cleanSymbol}
+          bars={barsQ.data?.bars}
+          fills={[]}
+          loading={barsQ.isLoading}
+          error={barsQ.isError}
+          errorMessage={barsQ.error instanceof Error ? barsQ.error.message : undefined}
+          targetPrice={parseAmountToNumber(target)}
+          stopPrice={parseAmountToNumber(stop)}
+          interval={SETUP_CHART_INTERVAL}
+          height={260}
+          hideHeaderLabel
+          drawingTools
+        />
+      </Suspense>
     </div>
   );
 }
