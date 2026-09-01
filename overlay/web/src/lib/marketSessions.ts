@@ -1,9 +1,9 @@
 export interface MarketSessionDef {
-  id: "tokyo" | "london" | "new-york";
+  id: "sydney" | "tokyo" | "london" | "new-york";
   label: string;
   timeZone: string;
-  openUtcHour: number;
-  closeUtcHour: number;
+  openLocalHour: number;
+  closeLocalHour: number;
 }
 
 export interface MarketSessionState extends MarketSessionDef {
@@ -15,40 +15,98 @@ export interface MarketSessionState extends MarketSessionDef {
 }
 
 export const MARKET_SESSIONS: MarketSessionDef[] = [
-  { id: "tokyo", label: "Tokyo", timeZone: "Asia/Tokyo", openUtcHour: 0, closeUtcHour: 9 },
-  { id: "london", label: "London", timeZone: "Europe/London", openUtcHour: 8, closeUtcHour: 17 },
+  {
+    id: "sydney",
+    label: "Sydney",
+    timeZone: "Australia/Sydney",
+    openLocalHour: 7,
+    closeLocalHour: 16,
+  },
+  { id: "tokyo", label: "Tokyo", timeZone: "Asia/Tokyo", openLocalHour: 9, closeLocalHour: 18 },
+  {
+    id: "london",
+    label: "London",
+    timeZone: "Europe/London",
+    openLocalHour: 8,
+    closeLocalHour: 17,
+  },
   {
     id: "new-york",
     label: "New York",
     timeZone: "America/New_York",
-    openUtcHour: 13,
-    closeUtcHour: 22,
+    openLocalHour: 8,
+    closeLocalHour: 17,
   },
 ];
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-const HOUR_MS = 60 * 60 * 1000;
-
-function utcDayStart(at: Date): number {
-  return Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate());
+interface ZonedParts {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  weekday: string;
 }
 
-function sessionInstant(at: Date, hour: number, dayOffset = 0): Date {
-  return new Date(utcDayStart(at) + dayOffset * DAY_MS + hour * HOUR_MS);
+function zonedParts(at: Date, timeZone: string): ZonedParts {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    weekday: "short",
+  }).formatToParts(at);
+  const part = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  return {
+    year: Number(part("year")),
+    month: Number(part("month")),
+    day: Number(part("day")),
+    hour: Number(part("hour")),
+    minute: Number(part("minute")),
+    weekday: part("weekday"),
+  };
 }
 
-function isTradingDay(at: Date): boolean {
-  const day = at.getUTCDay();
-  return day >= 1 && day <= 5;
+function localTimestamp(parts: Omit<ZonedParts, "weekday">): number {
+  return Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute);
 }
 
-function nextTradingOpen(at: Date, hour: number): Date {
+function zonedInstant(
+  timeZone: string,
+  date: Pick<ZonedParts, "year" | "month" | "day">,
+  hour: number,
+): Date {
+  let guess = new Date(Date.UTC(date.year, date.month - 1, date.day, hour));
+  const target = Date.UTC(date.year, date.month - 1, date.day, hour);
+  for (let i = 0; i < 3; i += 1) {
+    const actual = zonedParts(guess, timeZone);
+    const delta = target - localTimestamp(actual);
+    if (delta === 0) break;
+    guess = new Date(guess.getTime() + delta);
+  }
+  return guess;
+}
+
+function addLocalDays(date: Pick<ZonedParts, "year" | "month" | "day">, days: number) {
+  const next = new Date(Date.UTC(date.year, date.month - 1, date.day + days));
+  return { year: next.getUTCFullYear(), month: next.getUTCMonth() + 1, day: next.getUTCDate() };
+}
+
+function isTradingWeekday(weekday: string): boolean {
+  return weekday !== "Sat" && weekday !== "Sun";
+}
+
+function nextTradingOpen(def: MarketSessionDef, at: Date, today: ZonedParts): Date {
   for (let offset = 0; offset < 8; offset += 1) {
-    const candidate = sessionInstant(at, hour, offset);
-    if (candidate <= at || !isTradingDay(candidate)) continue;
+    const date = addLocalDays(today, offset);
+    const candidate = zonedInstant(def.timeZone, date, def.openLocalHour);
+    if (candidate <= at || !isTradingWeekday(zonedParts(candidate, def.timeZone).weekday)) continue;
     return candidate;
   }
-  return sessionInstant(at, hour, 1);
+  return zonedInstant(def.timeZone, addLocalDays(today, 1), def.openLocalHour);
 }
 
 export function formatDurationUntil(to: Date, from: Date): string {
@@ -64,10 +122,11 @@ export function sessionState(
   now: Date,
   locale = "en-US",
 ): MarketSessionState {
-  const openToday = sessionInstant(now, def.openUtcHour);
-  const closeToday = sessionInstant(now, def.closeUtcHour);
-  const open = isTradingDay(now) && now >= openToday && now < closeToday;
-  const nextOpen = nextTradingOpen(now, def.openUtcHour);
+  const today = zonedParts(now, def.timeZone);
+  const openToday = zonedInstant(def.timeZone, today, def.openLocalHour);
+  const closeToday = zonedInstant(def.timeZone, today, def.closeLocalHour);
+  const open = isTradingWeekday(today.weekday) && now >= openToday && now < closeToday;
+  const nextOpen = nextTradingOpen(def, now, today);
   const nextTransitionAt = open ? closeToday : nextOpen;
   const progress = open
     ? (now.getTime() - openToday.getTime()) / (closeToday.getTime() - openToday.getTime())

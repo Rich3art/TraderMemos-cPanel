@@ -178,6 +178,8 @@ describe("NewTradeDrawer", () => {
 
     const session = screen.getByLabelText("Session");
     expect(session).toHaveValue("");
+    await user.selectOptions(session, "Sydney");
+    expect(session).toHaveValue("Sydney");
     await user.selectOptions(session, "Asia");
     expect(session).toHaveValue("Asia");
     await user.selectOptions(session, "London");
