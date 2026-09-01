@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { CURRENCY_OPTIONS, currencyRegion, currencySymbol } from "./currency";
+import { CURRENCY_OPTIONS, currencyName, currencyRegion, currencySymbol } from "./currency";
 
 describe("CURRENCY_OPTIONS", () => {
   it("includes common account currencies beyond the display switch", () => {
@@ -53,5 +53,12 @@ describe("currencyRegion", () => {
 
   it("has no region for currencies outside the switch", () => {
     expect(currencyRegion("CAD")).toBeUndefined();
+  });
+});
+
+describe("currencyName", () => {
+  it("labels currencies outside the pinned display regions", () => {
+    expect(currencyName("zar")).toBe("South African rand");
+    expect(currencyName("AED")).toBe("United Arab Emirates dirham");
   });
 });

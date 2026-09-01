@@ -1,6 +1,5 @@
 import type { LucideIcon } from "lucide-react";
 import { DollarSign, Euro, JapaneseYen, PoundSterling } from "lucide-react";
-import type { DisplayCurrencyCode } from "./displayPrefs";
 
 export const CURRENCY_OPTIONS = [
   { code: "AED", name: "United Arab Emirates dirham" },
@@ -160,7 +159,7 @@ export const CURRENCY_OPTIONS = [
 ] as const;
 
 /** Lucide glyph for a display-currency code (shared ¥ for CNY/JPY). */
-const CURRENCY_ICONS: Record<DisplayCurrencyCode, LucideIcon> = {
+const CURRENCY_ICONS: Record<string, LucideIcon> = {
   USD: DollarSign,
   HKD: DollarSign,
   TWD: DollarSign,
@@ -178,7 +177,7 @@ const CURRENCY_ICONS: Record<DisplayCurrencyCode, LucideIcon> = {
  * Pinned rather than derived because `Intl` narrow symbols collapse to `$` / `¥`
  * and its wide symbols vary by locale (SGD renders as the code in en-US).
  */
-const CURRENCY_SYMBOLS: Record<DisplayCurrencyCode, string> = {
+const CURRENCY_SYMBOLS: Record<string, string> = {
   USD: "$",
   HKD: "HK$",
   TWD: "NT$",
@@ -191,7 +190,7 @@ const CURRENCY_SYMBOLS: Record<DisplayCurrencyCode, string> = {
 };
 
 /** Issuing region — the plain-language half of the code (`HKD` → Hong Kong). */
-const CURRENCY_REGIONS: Record<DisplayCurrencyCode, string> = {
+const CURRENCY_REGIONS: Record<string, string> = {
   USD: "United States",
   HKD: "Hong Kong",
   TWD: "Taiwan",
@@ -208,7 +207,7 @@ function normalize(code: string): string {
 }
 
 export function currencyIcon(code: string): LucideIcon {
-  return CURRENCY_ICONS[normalize(code) as DisplayCurrencyCode] ?? DollarSign;
+  return CURRENCY_ICONS[normalize(code)] ?? DollarSign;
 }
 
 /**
@@ -217,7 +216,7 @@ export function currencyIcon(code: string): LucideIcon {
  */
 export function currencySymbol(code: string): string {
   const key = normalize(code);
-  const pinned = CURRENCY_SYMBOLS[key as DisplayCurrencyCode];
+  const pinned = CURRENCY_SYMBOLS[key];
   if (pinned) return pinned;
   try {
     return new Intl.NumberFormat("en-US", {
@@ -235,5 +234,9 @@ export function currencySymbol(code: string): string {
 
 /** Issuing region, or `undefined` for codes outside the display switch. */
 export function currencyRegion(code: string): string | undefined {
-  return CURRENCY_REGIONS[normalize(code) as DisplayCurrencyCode];
+  return CURRENCY_REGIONS[normalize(code)];
+}
+
+export function currencyName(code: string): string | undefined {
+  return CURRENCY_OPTIONS.find((currency) => currency.code === normalize(code))?.name;
 }

@@ -2,7 +2,7 @@ import { useRouterState } from "@tanstack/react-router";
 import { Eye, EyeOff, Search, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/cn";
-import { currencyIcon, currencyRegion, currencySymbol } from "@/lib/currency";
+import { currencyIcon, currencyName, currencyRegion, currencySymbol } from "@/lib/currency";
 import {
   accountBaseCurrency,
   DISPLAY_CURRENCIES,
@@ -91,7 +91,7 @@ function CurrencyOptionLabel({ code, detail }: { code: string; detail?: string }
 
 /** Menu row: symbol column, code, then the issuing region as a quiet trailing hint. */
 function CurrencyMenuItem({ value, code }: { value: string; code: string }) {
-  const region = currencyRegion(code);
+  const region = currencyRegion(code) ?? currencyName(code);
   return (
     <MenuRadioItem value={value} closeOnClick className="pe-2.5">
       <span className="flex w-full items-center gap-2">
@@ -140,7 +140,7 @@ export function DisplayCurrencySelect({
     },
     ...convertible.map((code) => ({
       value: code,
-      label: <CurrencyOptionLabel code={code} detail={currencyRegion(code)} />,
+      label: <CurrencyOptionLabel code={code} detail={currencyRegion(code) ?? currencyName(code)} />,
       shortLabel: <CurrencyOptionLabel code={code} />,
     })),
   ];
@@ -151,7 +151,7 @@ export function DisplayCurrencySelect({
       return;
     }
     if ((DISPLAY_CURRENCIES as readonly string[]).includes(v)) {
-      setDisplayCurrency(v as (typeof DISPLAY_CURRENCIES)[number]);
+      setDisplayCurrency(v);
     }
   }
 
