@@ -1029,6 +1029,7 @@ type RuleModalState = { open: false } | { open: true; mode: "set" | "edit"; key:
 const RISK_RULE_ICONS: Record<RiskRuleKey, LucideIcon> = {
   max_risk_per_trade: Crosshair,
   max_daily_loss: TrendingDown,
+  max_daily_drawdown: TrendingDown,
   max_open_risk: Layers,
   max_trades_per_day: Hash,
   max_consecutive_losses: Repeat,

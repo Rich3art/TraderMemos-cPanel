@@ -1,0 +1,1 @@
+ALTER TABLE risk_rules ADD COLUMN IF NOT EXISTS max_daily_drawdown DOUBLE PRECISION;

@@ -259,6 +259,7 @@ type RiskRule struct {
 	UserID                string          `json:"user_id"`
 	MaxRiskPerTrade       sql.NullFloat64 `json:"max_risk_per_trade"`
 	MaxDailyLoss          sql.NullFloat64 `json:"max_daily_loss"`
+	MaxDailyDrawdown      sql.NullFloat64 `json:"max_daily_drawdown"`
 	MaxOpenRisk           sql.NullFloat64 `json:"max_open_risk"`
 	DefaultAccountRiskPct sql.NullFloat64 `json:"default_account_risk_pct"`
 	UpdatedAt             time.Time       `json:"updated_at"`

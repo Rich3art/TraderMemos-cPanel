@@ -22,6 +22,8 @@ export interface ComplianceDay {
   risk_violations: number;
   unknown_risk: number;
   daily_loss_breach: boolean;
+  daily_drawdown: number;
+  drawdown_breach: boolean;
   trade_limit_breach: boolean;
   loss_streak_breach: boolean;
   compliant: boolean;
@@ -37,6 +39,7 @@ export interface ComplianceReport {
   risk_violations: number;
   unknown_risk: number;
   daily_loss_breaches: number;
+  drawdown_breaches: number;
   trade_limit_breaches: number;
   loss_streak_breaches: number;
 }

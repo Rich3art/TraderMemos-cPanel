@@ -244,6 +244,7 @@ const baseProps = {
   riskRules: {
     max_risk_per_trade: null,
     max_daily_loss: null,
+    max_daily_drawdown: null,
     max_open_risk: null,
     default_account_risk_pct: null,
     max_trades_per_day: null,
@@ -410,6 +411,7 @@ describe("SettingsView", () => {
       riskRules: {
         max_risk_per_trade: 100,
         max_daily_loss: null,
+        max_daily_drawdown: null,
         max_open_risk: null,
         default_account_risk_pct: null,
         max_trades_per_day: null,
