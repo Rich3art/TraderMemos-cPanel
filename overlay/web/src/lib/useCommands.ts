@@ -1,0 +1,179 @@
+import { useNavigate } from "@tanstack/react-router";
+import {
+  BookOpen,
+  BookOpenCheck,
+  CalendarDays,
+  Calculator,
+  House,
+  List,
+  Newspaper,
+  PieChart,
+  Plus,
+  Settings,
+  StickyNote,
+  Upload,
+  Zap,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { useMemo } from "react";
+import { isAppHotkeyId } from "./hotkeys";
+import { useHotkeyBindings } from "./keybindings";
+import { TOOL_ITEMS } from "./tools";
+import { useToolRunner } from "./useToolRunner";
+import { useUI, type ModalKind } from "./ui";
+
+export type CommandGroup = "Navigate" | "Actions" | "Tools";
+
+export interface CommandItem {
+  id: string;
+  label: string;
+  group: CommandGroup;
+  icon: LucideIcon;
+  keywords: string[];
+  /** UI badge for the bound hotkey, when one exists. */
+  shortcut?: string;
+  run: () => void;
+}
+
+const NAV_COMMANDS: Array<{
+  id: string;
+  label: string;
+  to: string;
+  icon: LucideIcon;
+  keywords?: string[];
+}> = [
+  {
+    id: "nav-home",
+    label: "Home",
+    to: "/home",
+    icon: House,
+  },
+  { id: "nav-trades", label: "Trades", to: "/trades", icon: List },
+  {
+    id: "nav-calendar",
+    label: "Calendar",
+    to: "/calendar",
+    icon: CalendarDays,
+  },
+  { id: "nav-stats", label: "Stats", to: "/reports", icon: PieChart },
+  {
+    id: "nav-events",
+    label: "Economic Events",
+    to: "/events",
+    icon: Newspaper,
+    keywords: ["news", "economic calendar", "cpi", "nfp", "fomc"],
+  },
+  { id: "nav-playbook", label: "Playbook", to: "/playbook", icon: BookOpen },
+  {
+    id: "nav-notes",
+    label: "Notes",
+    to: "/notes",
+    icon: StickyNote,
+    keywords: ["journal", "memo"],
+  },
+  {
+    id: "nav-calculator",
+    label: "Calculator",
+    to: "/calculator",
+    icon: Calculator,
+    keywords: ["r-multiple", "r", "exit ladder", "fvg", "position size", "trade planner"],
+  },
+  { id: "nav-import ", label: "Import", to: "/import", icon: Upload },
+  {
+    id: "nav-settings",
+    label: "Settings",
+    to: "/settings",
+    icon: Settings,
+  },
+];
+
+const ACTION_COMMANDS: Array<{
+  id: string;
+  label: string;
+  modal: ModalKind;
+  icon: LucideIcon;
+  keywords?: string[];
+}> = [
+  {
+    id: "action-new-trade",
+    label: "New Trade",
+    modal: "new-trade",
+    icon: Plus,
+    keywords: ["log", "create"],
+  },
+  {
+    id: "action-new-setup",
+    label: "New Setup",
+    modal: "new-setup",
+    icon: Zap,
+    keywords: ["playbook"],
+  },
+  {
+    id: "action-new-note",
+    label: "New Note",
+    modal: "new-note",
+    icon: StickyNote,
+    keywords: ["journal"],
+  },
+  {
+    id: "action-new-guide",
+    label: "New Guide",
+    modal: "new-guide",
+    icon: BookOpenCheck,
+    keywords: ["guided trade", "plan", "psychology", "ai"],
+  },
+];
+
+export function useCommands(onRun?: () => void) {
+  const navigate = useNavigate();
+  const openModal = useUI((s) => s.openModal);
+  const runTool = useToolRunner();
+
+  const bindings = useHotkeyBindings();
+
+  return useMemo(() => {
+    // Labels follow the user's custom bindings (Settings → Shortcuts).
+    const shortcutFor = (id: string): string | undefined =>
+      isAppHotkeyId(id) ? bindings[id].label : undefined;
+
+    const wrap = (run: () => void) => () => {
+      run();
+      onRun?.();
+    };
+
+    const navigateCommands: CommandItem[] = NAV_COMMANDS.map((item) => ({
+      id: item.id,
+      label: item.label,
+      group: "Navigate",
+      icon: item.icon,
+      keywords: item.keywords ?? [],
+      shortcut: shortcutFor(item.id),
+      run: wrap(() => navigate({ to: item.to })),
+    }));
+
+    const actionCommands: CommandItem[] = ACTION_COMMANDS.map((item) => ({
+      id: item.id,
+      label: item.label,
+      group: "Actions",
+      icon: item.icon,
+      keywords: item.keywords ?? [],
+      shortcut: shortcutFor(item.id),
+      run: wrap(() => openModal(item.modal)),
+    }));
+
+    const toolCommands: CommandItem[] = TOOL_ITEMS.map((item) => {
+      const id = `tool-${item.id}`;
+      return {
+        id,
+        label: item.label,
+        group: "Tools" as const,
+        icon: item.icon,
+        keywords: item.keywords,
+        shortcut: shortcutFor(id),
+        run: wrap(() => runTool(item.id)),
+      };
+    });
+
+    return [...navigateCommands, ...actionCommands, ...toolCommands];
+  }, [bindings, navigate, onRun, openModal, runTool]);
+}

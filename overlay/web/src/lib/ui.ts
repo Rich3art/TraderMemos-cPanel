@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import type { SetupAttachment, TradeDetail } from "./api/types";
 
-export type ModalKind = "new-trade" | "new-setup" | "new-note";
+export type ModalKind = "new-trade" | "new-setup" | "new-note" | "new-guide";
 
 /** Prefill payload when converting a setup → New Trade. */
 export interface TradeDraft {

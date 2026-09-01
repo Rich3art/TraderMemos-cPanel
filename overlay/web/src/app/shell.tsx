@@ -17,6 +17,7 @@ import { useAuth } from "@/lib/auth";
 import { useAppHotkeys } from "@/lib/useAppHotkeys";
 import { useUI } from "@/lib/ui";
 import { NewNoteDrawer } from "./drawers/NewNoteDrawer";
+import { NewGuideDrawer } from "./drawers/NewGuideDrawer";
 import { NewSetupDrawer } from "./drawers/NewSetupDrawer";
 import { NewTradeDrawer } from "./drawers/NewTradeDrawer";
 import { usePrefsSync } from "@/lib/hooks/usePrefsSync";
@@ -63,6 +64,7 @@ function AuthedShell() {
       <KellyModal open={kellyOpen} onOpenChange={setKellyOpen} />
       <FxConverterModal open={fxOpen} onOpenChange={setFxOpen} />
       <NewTradeDrawer />
+      <NewGuideDrawer />
       <NewSetupDrawer />
       <NewNoteDrawer />
     </div>
