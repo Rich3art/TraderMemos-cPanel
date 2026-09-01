@@ -18,6 +18,7 @@ import { inferMarketFromSymbol, MARKET_LABELS } from "@/lib/marketInference";
 import { useAccounts } from "@/lib/hooks/useAccounts";
 import { useCreateExecutions } from "@/lib/hooks/useExecutions";
 import { useMarketBars } from "@/lib/hooks/useMarketBars";
+import { useCoachSettings } from "@/lib/hooks/useCoachSettings";
 import { usePsychologyQuestions } from "@/lib/hooks/usePsychologyQuestions";
 import { useSetups } from "@/lib/hooks/useSetups";
 import { buildStructuredJournalNotes } from "@/lib/journalNotes";
@@ -53,6 +54,7 @@ export function NewGuideDrawer() {
   const accounts = useAccounts().data ?? [];
   const setups = useSetups().data ?? [];
   const psychology = usePsychologyQuestions().data?.questions ?? [];
+  const coachEnabled = useCoachSettings().data?.enabled === true;
 
   const [step, setStep] = useState(0);
   const [accountId, setAccountId] = useState("");
@@ -180,11 +182,13 @@ export function NewGuideDrawer() {
       ]
         .filter(Boolean)
         .join("\n\n");
+      let finalGuideBody = guideBody;
+      let coachReviewFailed = false;
       await tradesApi.patch(tradeId, {
         notes: buildStructuredJournalNotes({
           session,
           entryReason,
-          reviewNotes: [reviewNotes, guideBody].filter(Boolean).join("\n\n"),
+          reviewNotes: [reviewNotes, finalGuideBody].filter(Boolean).join("\n\n"),
         }),
         setup_id: setupId,
         setup_ids: setupId ? [setupId] : [],
@@ -192,8 +196,48 @@ export function NewGuideDrawer() {
         target_price: numberOrNull(target) ?? undefined,
         stop_price: numberOrNull(stop) ?? undefined,
       });
+      if (coachEnabled) {
+        try {
+          const coach = await tradesApi.coach(tradeId);
+          if (coach.source === "llm" && coach.notes.length > 0) {
+            const aiBlock = [
+              "## AI Coach Review",
+              ...coach.notes
+                .sort((a, b) => a.priority - b.priority)
+                .map((n) => `- ${n.headline}: ${n.detail}`),
+              coach.next_action ? `Next action: ${coach.next_action}` : "",
+            ]
+              .filter(Boolean)
+              .join("\n");
+            finalGuideBody = `${guideBody}\n\n${aiBlock}`;
+            await tradesApi.patch(tradeId, {
+              notes: buildStructuredJournalNotes({
+                session,
+                entryReason,
+                reviewNotes: [reviewNotes, finalGuideBody].filter(Boolean).join("\n\n"),
+              }),
+              setup_id: setupId,
+              setup_ids: setupId ? [setupId] : [],
+              initial_risk: numberOrNull(stop) != null ? Math.abs(price - numberOrNull(stop)!) * qty : undefined,
+              target_price: numberOrNull(target) ?? undefined,
+              stop_price: numberOrNull(stop) ?? undefined,
+            });
+          } else if (coach.source === "error") {
+            coachReviewFailed = true;
+          }
+        } catch {
+          coachReviewFailed = true;
+        }
+      }
       await queryClient.invalidateQueries({ queryKey: ["trades"] });
-      toast.add({ title: "Guide logged", description: `${sym} trade saved with guide analysis.` });
+      toast.add({
+        title: "Guide logged",
+        description: coachEnabled
+          ? coachReviewFailed
+            ? `${sym} saved; local guide kept because AI coach failed.`
+            : `${sym} saved with guide and AI coach notes.`
+          : `${sym} saved with local guide analysis.`,
+      });
       close();
     } catch (e) {
       const message = e instanceof Error ? e.message : "Save failed";
