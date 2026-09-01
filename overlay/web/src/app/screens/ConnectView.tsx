@@ -32,6 +32,7 @@ import { useFlexSync } from "@/lib/hooks/useFlexSync";
 import { Badge } from "@/components/reui/badge";
 import type { Account } from "@/lib/api/types";
 import { type BrokerConnectKind, type BrokerDef, findBroker, KIND_LABEL } from "@/lib/brokers";
+import { CURRENCY_OPTIONS } from "@/lib/currency";
 import { useAccounts, useCreateAccount } from "@/lib/hooks/useAccounts";
 
 function errorText(err: unknown, fallback: string): string {
@@ -147,13 +148,19 @@ function AccountPanel({
                 />
               </Field>
               <Field label="Base currency" htmlFor="connect-account-currency">
-                <FormInput
+                <NativeSelect
                   id="connect-account-currency"
                   value={choice.currency}
                   onChange={(event) => set({ currency: event.target.value })}
-                  placeholder="USD"
                   disabled={busy}
-                />
+                  wrapperClassName="w-full"
+                >
+                  {CURRENCY_OPTIONS.map((currency) => (
+                    <NativeSelectOption key={currency.code} value={currency.code}>
+                      {currency.code} - {currency.name}
+                    </NativeSelectOption>
+                  ))}
+                </NativeSelect>
               </Field>
               <Field label="Account type">
                 <NativeSelect

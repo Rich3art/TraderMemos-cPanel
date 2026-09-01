@@ -48,6 +48,7 @@ import { ApiError, editableApiBaseUrl, getCustomApiBaseUrl, setBaseUrl } from "@
 import { applyParsedAppConfig, buildAppConfigExport, parseAppConfig } from "@/lib/appConfig";
 import { computeAnnualGoalProgress, ytdFiltersForYear } from "@/lib/annualGoal";
 import { cn } from "@/lib/cn";
+import { CURRENCY_OPTIONS } from "@/lib/currency";
 import { useSummary } from "@/lib/hooks/useAnalytics";
 import type { AnnualGoal, RiskRules } from "@/lib/api/settings";
 import {
@@ -555,13 +556,19 @@ export function AccountsTab({
               <accountForm.Field name="baseCurrency">
                 {(field) => (
                   <Field label="Base currency" htmlFor="acct-currency">
-                    <FormInput
+                    <NativeSelect
                       id="acct-currency"
                       value={field.state.value}
                       onBlur={field.handleBlur}
                       onChange={(e) => field.handleChange(e.target.value)}
-                      placeholder="USD"
-                    />
+                      wrapperClassName="w-full"
+                    >
+                      {CURRENCY_OPTIONS.map((currency) => (
+                        <NativeSelectOption key={currency.code} value={currency.code}>
+                          {currency.code} - {currency.name}
+                        </NativeSelectOption>
+                      ))}
+                    </NativeSelect>
                   </Field>
                 )}
               </accountForm.Field>
