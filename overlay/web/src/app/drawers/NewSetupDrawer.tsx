@@ -24,6 +24,8 @@ import { useToastManager } from "@/components/Toast";
 import { Button } from "@/components/ui/button";
 import { parseAmountToNumber } from "@/lib/amountInput";
 import { setupsApi } from "@/lib/api/setups";
+import type { BarInterval } from "@/lib/api/market";
+import { TradeChart } from "@/components/charts/TradeChart";
 import { capScreenshots, useJournalPrefs } from "@/lib/journalPrefs";
 import {
   useCreateSetup,
@@ -32,6 +34,8 @@ import {
   useUpdateSetup,
   useUploadSetupAttachment,
 } from "@/lib/hooks/useSetups";
+import { snapChartTime, useMarketBars } from "@/lib/hooks/useMarketBars";
+import { inferMarketFromSymbol } from "@/lib/marketInference";
 import { useUI } from "@/lib/ui";
 
 /** Checklist textarea → one trimmed item per non-empty line. */
@@ -52,6 +56,9 @@ const EMPTY_VALUES = {
   checklistText: "",
 };
 
+const SETUP_CHART_INTERVAL: BarInterval = "240";
+const SETUP_CHART_LOOKBACK_MS = 180 * 86_400_000;
+
 function valuesFromDraft(draft: NonNullable<ReturnType<typeof useUI.getState>["setupDraft"]>) {
   return {
     name: draft.name,
@@ -62,6 +69,54 @@ function valuesFromDraft(draft: NonNullable<ReturnType<typeof useUI.getState>["s
     stop: draft.stop,
     checklistText: draft.checklistText,
   };
+}
+
+function setupChartWindow() {
+  const to = new Date();
+  const from = new Date(to.getTime() - SETUP_CHART_LOOKBACK_MS);
+  return { from: snapChartTime(from.toISOString()), to: snapChartTime(to.toISOString()) };
+}
+
+function SetupSymbolChart({
+  symbol,
+  target,
+  stop,
+}: {
+  symbol: string;
+  target: string;
+  stop: string;
+}) {
+  const cleanSymbol = symbol.trim().toUpperCase();
+  const range = useMemo(() => setupChartWindow(), [cleanSymbol]);
+  const barsQ = useMarketBars({
+    symbol: cleanSymbol,
+    instrument_type: inferMarketFromSymbol(cleanSymbol),
+    from: range.from,
+    to: range.to,
+    interval: SETUP_CHART_INTERVAL,
+    enabled: cleanSymbol.length > 0,
+  });
+
+  if (!cleanSymbol) return null;
+
+  return (
+    <div className="rounded-lg bg-card p-3">
+      <TradeChart
+        symbol={cleanSymbol}
+        bars={barsQ.data?.bars}
+        fills={[]}
+        loading={barsQ.isLoading}
+        error={barsQ.isError}
+        errorMessage={barsQ.error instanceof Error ? barsQ.error.message : undefined}
+        targetPrice={parseAmountToNumber(target)}
+        stopPrice={parseAmountToNumber(stop)}
+        interval={SETUP_CHART_INTERVAL}
+        height={260}
+        hideHeaderLabel
+        drawingTools
+      />
+    </div>
+  );
 }
 
 export function NewSetupDrawer() {
@@ -307,6 +362,12 @@ export function NewSetupDrawer() {
                 )}
               </form.Field>
             </div>
+
+            <form.Subscribe selector={(s) => [s.values.symbol, s.values.target, s.values.stop]}>
+              {([symbol, target, stop]) => (
+                <SetupSymbolChart symbol={symbol} target={target} stop={stop} />
+              )}
+            </form.Subscribe>
 
             <form.Field name="thesis">
               {(field) => (

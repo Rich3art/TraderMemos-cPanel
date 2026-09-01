@@ -21,6 +21,26 @@ vi.mock("../../components/Toast", () => ({
   useToastManager: () => ({ add: vi.fn<(...args: any[]) => any>() }),
 }));
 
+const tradeChartSpy = vi.hoisted(() => vi.fn<(...args: any[]) => any>(() => null));
+
+vi.mock("../../components/charts/TradeChart", () => ({
+  TradeChart: (props: unknown) => {
+    tradeChartSpy(props);
+    return <div data-testid="setup-symbol-chart" />;
+  },
+}));
+
+vi.mock("../../lib/hooks/useMarketBars", () => ({
+  snapChartTime: (iso: string) => iso,
+  useMarketBars: (params: unknown) => ({
+    data: { bars: [] },
+    isLoading: false,
+    isError: false,
+    error: null,
+    params,
+  }),
+}));
+
 const mockedCreate = vi.mocked(setupsApi.create);
 const mockedUpdate = vi.mocked(setupsApi.update);
 const mockedListAttachments = vi.mocked(setupsApi.listAttachments);
@@ -50,6 +70,7 @@ describe("NewSetupDrawer", () => {
       storage_key: "u1/setups/att1",
       created_at: new Date().toISOString(),
     });
+    tradeChartSpy.mockClear();
     useUI.setState({ modal: null, setupDraft: null, tradeDraft: null });
     useUI.getState().openModal("new-setup");
   });
@@ -91,6 +112,26 @@ describe("NewSetupDrawer", () => {
     await userEvent.click(screen.getByRole("button", { name: /save setup/i }));
 
     await waitFor(() => expect(mockedUploadAttachment).toHaveBeenCalledWith("s1", expect.any(FormData)));
+  });
+
+  it("shows a drawing-enabled chart for the setup symbol", async () => {
+    wrap(<NewSetupDrawer />);
+
+    await userEvent.type(screen.getByLabelText("Symbol"), "btcusdt");
+    await userEvent.type(screen.getByLabelText("Target"), "120000");
+    await userEvent.type(screen.getByLabelText("Stop"), "98000");
+
+    expect(screen.getByTestId("setup-symbol-chart")).toBeInTheDocument();
+    expect(tradeChartSpy).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        symbol: "BTCUSDT",
+        fills: [],
+        interval: "240",
+        targetPrice: 120000,
+        stopPrice: 98000,
+        drawingTools: true,
+      }),
+    );
   });
 
   it("edits an existing setup from a draft", async () => {
