@@ -1,7 +1,7 @@
 // TraderMemosSync.mq4
 // Attach this Expert Advisor to any MT4 chart to send closed order fills to TraderMemos.
 #property strict
-#property version "1.10"
+#property version "1.11"
 
 input string TraderMemosServer = "https://journal.ranksmedia.com";
 input string TraderMemosToken = "";
@@ -100,7 +100,8 @@ int PostExecution(int ticket, string suffix, string side, datetime executedAt, d
    payload += "\"commission\":" + DoubleToString(MathAbs(commission), 8) + ",";
    payload += "\"executed_at\":\"" + IsoUtc(executedAt) + "\",";
    payload += "\"multiplier\":" + DoubleToString(MultiplierFor(symbol, instrument), 2) + ",";
-   payload += "\"details\":{\"source\":\"metatrader4\",\"ticket\":\"" + IntegerToString(ticket) + "\",\"fill\":\"" + suffix + "\"," + AccountMetricsJson() + "}";
+   double profit = suffix == "close" ? OrderProfit() : 0.0;
+   payload += "\"details\":{\"source\":\"metatrader4\",\"ticket\":\"" + IntegerToString(ticket) + "\",\"fill\":\"" + suffix + "\",\"broker_profit\":\"" + DoubleToString(profit, 8) + "\"," + AccountMetricsJson() + "}";
    payload += "}";
 
    char body[];

@@ -150,6 +150,7 @@ type Querier interface {
 	UpdateAlertChannelStatus(ctx context.Context, arg UpdateAlertChannelStatusParams) error
 	UpdateCashTransaction(ctx context.Context, arg UpdateCashTransactionParams) (CashTransaction, error)
 	UpdateExecution(ctx context.Context, arg UpdateExecutionParams) (int64, error)
+	UpdateExecutionDetails(ctx context.Context, arg UpdateExecutionDetailsParams) (int64, error)
 	UpdateExecutionContract(ctx context.Context, arg UpdateExecutionContractParams) error
 	UpdateFlexSyncStatus(ctx context.Context, arg UpdateFlexSyncStatusParams) error
 	UpdateJournalNote(ctx context.Context, arg UpdateJournalNoteParams) (JournalNote, error)

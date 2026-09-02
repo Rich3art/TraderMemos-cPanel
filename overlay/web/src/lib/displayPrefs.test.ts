@@ -29,6 +29,15 @@ describe("accountBaseCurrency", () => {
   it("falls back when no account is selected", () => {
     expect(accountBaseCurrency(accounts, undefined)).toBe("USD");
   });
+
+  it("uses the shared account currency for an all-accounts scope", () => {
+    expect(
+      accountBaseCurrency([
+        { id: "a1", base_currency: "ZAR" },
+        { id: "a2", base_currency: "ZAR" },
+      ]),
+    ).toBe("ZAR");
+  });
 });
 
 describe("display currency override", () => {

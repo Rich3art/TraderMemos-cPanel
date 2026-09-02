@@ -1,7 +1,7 @@
 // TraderMemosSync.mq5
 // Attach this Expert Advisor to any MT5 chart to send filled deals to TraderMemos.
 #property strict
-#property version "1.10"
+#property version "1.11"
 
 input string TraderMemosServer = "https://journal.ranksmedia.com";
 input string TraderMemosToken = "";
@@ -93,6 +93,7 @@ int PostExecution(ulong ticket)
    double price = HistoryDealGetDouble(ticket, DEAL_PRICE);
    double commission = MathAbs(HistoryDealGetDouble(ticket, DEAL_COMMISSION));
    double swap = MathAbs(HistoryDealGetDouble(ticket, DEAL_SWAP));
+   double profit = HistoryDealGetDouble(ticket, DEAL_PROFIT);
    datetime executedAt = (datetime)HistoryDealGetInteger(ticket, DEAL_TIME);
 
    string payload = "{";
@@ -106,7 +107,7 @@ int PostExecution(ulong ticket)
    payload += "\"commission\":" + DoubleToString(commission, 8) + ",";
    payload += "\"executed_at\":\"" + IsoUtc(executedAt) + "\",";
    payload += "\"multiplier\":" + DoubleToString(MultiplierFor(symbol, instrument), 2) + ",";
-   payload += "\"details\":{\"source\":\"metatrader5\",\"ticket\":\"" + IntegerToString((long)ticket) + "\"," + AccountMetricsJson() + "}";
+   payload += "\"details\":{\"source\":\"metatrader5\",\"ticket\":\"" + IntegerToString((long)ticket) + "\",\"broker_profit\":\"" + DoubleToString(profit, 8) + "\"," + AccountMetricsJson() + "}";
    payload += "}";
 
    uchar body[];

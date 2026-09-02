@@ -406,9 +406,11 @@ export function accountBaseCurrency(
   fallback = "USD",
 ): string {
   const ids = typeof accountId === "string" ? [accountId] : (accountId ?? []);
+  const scopedAccounts =
+    ids.length > 0 ? accounts.filter((account) => ids.includes(account.id)) : accounts;
   let base: string | undefined;
-  for (const id of ids) {
-    const currency = accounts.find((a) => a.id === id)?.base_currency;
+  for (const account of scopedAccounts) {
+    const currency = account.base_currency;
     if (!currency) continue;
     if (base === undefined) base = currency;
     else if (currency !== base) return fallback;
