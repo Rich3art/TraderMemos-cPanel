@@ -1,7 +1,7 @@
 // TraderMemosSync.mq5
 // Attach this Expert Advisor to any MT5 chart to send filled deals to TraderMemos.
 #property strict
-#property version "1.13"
+#property version "1.14"
 
 input string TraderMemosServer = "https://journal.ranksmedia.com";
 input string TraderMemosToken = "";
@@ -94,6 +94,7 @@ int PostExecution(ulong ticket)
    double commission = MathAbs(HistoryDealGetDouble(ticket, DEAL_COMMISSION));
    double swap = MathAbs(HistoryDealGetDouble(ticket, DEAL_SWAP));
    double profit = HistoryDealGetDouble(ticket, DEAL_PROFIT);
+   long positionId = HistoryDealGetInteger(ticket, DEAL_POSITION_ID);
    datetime executedAt = (datetime)HistoryDealGetInteger(ticket, DEAL_TIME);
 
    string payload = "{";
@@ -107,7 +108,7 @@ int PostExecution(ulong ticket)
    payload += "\"commission\":" + DoubleToString(commission, 8) + ",";
    payload += "\"executed_at\":\"" + IsoUtc(executedAt) + "\",";
    payload += "\"multiplier\":" + DoubleToString(MultiplierFor(symbol, instrument), 2) + ",";
-   payload += "\"details\":{\"source\":\"metatrader5\",\"ticket\":\"" + IntegerToString((long)ticket) + "\",\"broker_profit\":\"" + DoubleToString(profit, 8) + "\"," + AccountMetricsJson() + "}";
+   payload += "\"details\":{\"source\":\"metatrader5\",\"ticket\":\"" + IntegerToString((long)ticket) + "\",\"lot\":\"mt5-position-" + IntegerToString(positionId) + "\",\"position_id\":\"" + IntegerToString(positionId) + "\",\"broker_profit\":\"" + DoubleToString(profit, 8) + "\"," + AccountMetricsJson() + "}";
    payload += "}";
 
    uchar body[];
