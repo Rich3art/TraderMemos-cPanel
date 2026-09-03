@@ -1,7 +1,7 @@
 // TraderMemosSync.mq5
 // Attach this Expert Advisor to any MT5 chart to send filled deals to TraderMemos.
 #property strict
-#property version "1.14"
+#property version "1.15"
 
 input string TraderMemosServer = "https://journal.ranksmedia.com";
 input string TraderMemosToken = "";
@@ -144,7 +144,7 @@ string CashTypeForDeal(long type, double amount)
 {
    if(type == DEAL_TYPE_BALANCE) return amount >= 0 ? "deposit" : "withdrawal";
    if(type == DEAL_TYPE_CREDIT) return "adjustment";
-   if(type == DEAL_TYPE_CHARGE || type == DEAL_TYPE_TAX) return "fee";
+   if(type == DEAL_TYPE_CHARGE) return "fee";
    if(type == DEAL_TYPE_BONUS || type == DEAL_TYPE_CORRECTION) return "adjustment";
    return "";
 }
@@ -154,7 +154,6 @@ string DealTypeName(long type)
    if(type == DEAL_TYPE_BALANCE) return "balance";
    if(type == DEAL_TYPE_CREDIT) return "credit";
    if(type == DEAL_TYPE_CHARGE) return "charge";
-   if(type == DEAL_TYPE_TAX) return "tax";
    if(type == DEAL_TYPE_BONUS) return "bonus";
    if(type == DEAL_TYPE_CORRECTION) return "correction";
    return "cash";
