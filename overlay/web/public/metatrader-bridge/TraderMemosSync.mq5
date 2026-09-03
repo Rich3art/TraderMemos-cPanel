@@ -1,7 +1,7 @@
 // TraderMemosSync.mq5
 // Attach this Expert Advisor to any MT5 chart to send filled deals to TraderMemos.
 #property strict
-#property version "1.12"
+#property version "1.13"
 
 input string TraderMemosServer = "https://journal.ranksmedia.com";
 input string TraderMemosToken = "";
@@ -139,6 +139,74 @@ int PostExecution(ulong ticket)
    return -1;
 }
 
+string CashTypeForDeal(long type, double amount)
+{
+   if(type == DEAL_TYPE_BALANCE) return amount >= 0 ? "deposit" : "withdrawal";
+   if(type == DEAL_TYPE_CREDIT) return "adjustment";
+   if(type == DEAL_TYPE_CHARGE || type == DEAL_TYPE_TAX) return "fee";
+   if(type == DEAL_TYPE_BONUS || type == DEAL_TYPE_CORRECTION) return "adjustment";
+   return "";
+}
+
+string DealTypeName(long type)
+{
+   if(type == DEAL_TYPE_BALANCE) return "balance";
+   if(type == DEAL_TYPE_CREDIT) return "credit";
+   if(type == DEAL_TYPE_CHARGE) return "charge";
+   if(type == DEAL_TYPE_TAX) return "tax";
+   if(type == DEAL_TYPE_BONUS) return "bonus";
+   if(type == DEAL_TYPE_CORRECTION) return "correction";
+   return "cash";
+}
+
+int PostCashMovement(ulong ticket)
+{
+   long type = HistoryDealGetInteger(ticket, DEAL_TYPE);
+   double amount = HistoryDealGetDouble(ticket, DEAL_PROFIT);
+   string cashType = CashTypeForDeal(type, amount);
+   if(cashType == "" || amount == 0) return 0;
+
+   datetime occurredAt = (datetime)HistoryDealGetInteger(ticket, DEAL_TIME);
+   string dealName = DealTypeName(type);
+   string payload = "{";
+   payload += "\"account_id\":\"" + JsonEscape(TraderMemosAccountId) + "\",";
+   payload += "\"external_id\":\"mt5:" + IntegerToString((int)AccountInfoInteger(ACCOUNT_LOGIN)) + ":cash:" + IntegerToString((long)ticket) + "\",";
+   payload += "\"type\":\"" + cashType + "\",";
+   payload += "\"amount\":" + DoubleToString(amount, 8) + ",";
+   payload += "\"currency\":\"" + JsonEscape(AccountInfoString(ACCOUNT_CURRENCY)) + "\",";
+   payload += "\"occurred_at\":\"" + IsoUtc(occurredAt) + "\",";
+   payload += "\"note\":\"MetaTrader 5 " + dealName + " deal " + IntegerToString((long)ticket) + "\"";
+   payload += "}";
+
+   uchar body[];
+   int bytes = StringToCharArray(payload, body, 0, WHOLE_ARRAY, CP_UTF8);
+   if(bytes > 0) ArrayResize(body, bytes - 1);
+   uchar result[];
+   string resultHeaders;
+   string headers = "Content-Type: application/json\r\nAuthorization: Bearer " + TraderMemosToken + "\r\n";
+   string url = TraderMemosServer + "/api/v1/metatrader/cash-movements";
+   ResetLastError();
+   int status = WebRequest("POST", url, headers, 10000, body, result, resultHeaders);
+   if(status == 201)
+   {
+      Log("synced MT5 " + dealName + " " + IntegerToString((long)ticket) + " amount=" + DoubleToString(amount, 2) + " balance=" + DoubleToString(AccountInfoDouble(ACCOUNT_BALANCE), 2) + " equity=" + DoubleToString(AccountInfoDouble(ACCOUNT_EQUITY), 2) + " margin=" + DoubleToString(AccountInfoDouble(ACCOUNT_MARGIN), 2));
+      return 1;
+   }
+   if(status == 200 || status == 409)
+   {
+      Log("cash movement already in journal " + IntegerToString((long)ticket) + " (HTTP " + IntegerToString(status) + ")");
+      return 2;
+   }
+   if(status == -1)
+   {
+      int error = GetLastError();
+      Log("WebRequest failed for cash movement " + IntegerToString((long)ticket) + " with error " + IntegerToString(error) + ". In MT5 add " + TraderMemosServer + " under Tools > Options > Expert Advisors > Allow WebRequest.");
+      return -1;
+   }
+   Log("server rejected cash movement " + IntegerToString((long)ticket) + " with HTTP " + IntegerToString(status) + ": " + ResponseText(result));
+   return -1;
+}
+
 void SyncHistory()
 {
    if(TraderMemosToken == "" || TraderMemosAccountId == "")
@@ -168,6 +236,7 @@ void SyncHistory()
       ulong ticket = HistoryDealGetTicket(i);
       if(ticket <= lastTicket) continue;
       int result = PostExecution(ticket);
+      if(result == 0) result = PostCashMovement(ticket);
       if(result == 0) continue;
       attempted++;
       if(result == 1) synced++;

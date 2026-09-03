@@ -276,6 +276,14 @@ func (p *PG) GetAttachment(ctx context.Context, arg GetAttachmentParams) (TradeA
 	return TradeAttachment(v), nil
 }
 
+func (p *PG) GetCashTransactionByImportBatch(ctx context.Context, arg GetCashTransactionByImportBatchParams) (CashTransaction, error) {
+	v, err := p.q.GetCashTransactionByImportBatch(ctx, storepg.GetCashTransactionByImportBatchParams(arg))
+	if err != nil {
+		return CashTransaction{}, err
+	}
+	return CashTransaction(v), nil
+}
+
 func (p *PG) GetChecklistTemplate(ctx context.Context, userID string) (ChecklistTemplate, error) {
 	v, err := p.q.GetChecklistTemplate(ctx, userID)
 	if err != nil {

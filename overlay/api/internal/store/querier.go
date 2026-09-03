@@ -55,6 +55,7 @@ type Querier interface {
 	GetAlertSettings(ctx context.Context, userID string) (AlertSetting, error)
 	GetAnnualGoal(ctx context.Context, arg GetAnnualGoalParams) (AnnualGoal, error)
 	GetAttachment(ctx context.Context, arg GetAttachmentParams) (TradeAttachment, error)
+	GetCashTransactionByImportBatch(ctx context.Context, arg GetCashTransactionByImportBatchParams) (CashTransaction, error)
 	GetChecklistTemplate(ctx context.Context, userID string) (ChecklistTemplate, error)
 	GetCoachSettings(ctx context.Context) (CoachSetting, error)
 	GetEconomicEventsLastFetch(ctx context.Context, provider string) (string, error)
