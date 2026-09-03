@@ -68,7 +68,7 @@ func TestUpdateAccountNameAndBroker(t *testing.T) {
 	require.Equal(t, "FUTU", got["broker"])
 }
 
-func TestUpdateAccountCurrencyRegroupsTradeCurrency(t *testing.T) {
+func TestUpdateAccountCurrencyDoesNotRewriteTradeCurrency(t *testing.T) {
 	s := testServer(t)
 	tok := registerAndLogin(t, s, "upd-currency@x.com")
 	acc := accountID(t, s, tok)
@@ -90,7 +90,7 @@ func TestUpdateAccountCurrencyRegroupsTradeCurrency(t *testing.T) {
 	var trades []map[string]any
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &trades))
 	require.Len(t, trades, 1)
-	require.Equal(t, "ZAR", trades[0]["pnl_currency"])
+	require.Equal(t, "USD", trades[0]["pnl_currency"])
 }
 
 func TestCreateAccountSeedsOpeningDeposit(t *testing.T) {

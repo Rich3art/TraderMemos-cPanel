@@ -150,7 +150,6 @@ func (s *Server) handleUpdateAccount(c *echo.Context) error {
 	accountType := acc.AccountType
 	baseCurrency := acc.BaseCurrency
 	startingBalance := acc.StartingBalance
-	baseCurrencyChanged := false
 
 	if in.Name != nil {
 		name = strings.TrimSpace(*in.Name)
@@ -172,7 +171,6 @@ func (s *Server) handleUpdateAccount(c *echo.Context) error {
 		if baseCurrency == "" {
 			baseCurrency = "USD"
 		}
-		baseCurrencyChanged = !strings.EqualFold(baseCurrency, acc.BaseCurrency)
 	}
 	if in.StartingBalance != nil {
 		startingBalance = *in.StartingBalance
@@ -185,11 +183,6 @@ func (s *Server) handleUpdateAccount(c *echo.Context) error {
 	})
 	if err != nil {
 		return Fail(http.StatusInternalServerError, "internal", "could not update account", nil)
-	}
-	if baseCurrencyChanged {
-		if err := s.deps.Trades.Regroup(ctx, uid, id); err != nil {
-			return Fail(http.StatusInternalServerError, "internal", "account updated but trades could not be regrouped", nil)
-		}
 	}
 	return c.JSON(http.StatusOK, updated)
 }
