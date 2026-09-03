@@ -1,7 +1,7 @@
 // TraderMemosSync.mq4
 // Attach this Expert Advisor to any MT4 chart to send closed order fills to TraderMemos.
 #property strict
-#property version "1.11"
+#property version "1.12"
 
 input string TraderMemosServer = "https://journal.ranksmedia.com";
 input string TraderMemosToken = "";
@@ -174,7 +174,8 @@ void SyncHistory()
       if(closed < 0) failed++;
       if(opened > 0 && closed > 0 && ticket > newestOk) newestOk = ticket;
    }
-   if(newestOk > (int)last) GlobalVariableSet(StateKey(), newestOk);
+   if(failed == 0 && newestOk > (int)last) GlobalVariableSet(StateKey(), newestOk);
+   if(failed > 0) Log("sync state not advanced because one or more orders failed; they will be retried on the next check.");
    Log("history check complete: orders=" + IntegerToString(total) + ", attempted_fills=" + IntegerToString(attempted) + ", synced=" + IntegerToString(synced) + ", already_present=" + IntegerToString(duplicates) + ", failed=" + IntegerToString(failed));
 }
 

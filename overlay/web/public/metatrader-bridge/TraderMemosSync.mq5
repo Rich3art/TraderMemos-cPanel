@@ -1,7 +1,7 @@
 // TraderMemosSync.mq5
 // Attach this Expert Advisor to any MT5 chart to send filled deals to TraderMemos.
 #property strict
-#property version "1.11"
+#property version "1.12"
 
 input string TraderMemosServer = "https://journal.ranksmedia.com";
 input string TraderMemosToken = "";
@@ -175,7 +175,8 @@ void SyncHistory()
       if(result < 0) failed++;
       if(result > 0 && ticket > newestOk) newestOk = ticket;
    }
-   if(newestOk > lastTicket) GlobalVariableSet(StateKey(), (double)newestOk);
+   if(failed == 0 && newestOk > lastTicket) GlobalVariableSet(StateKey(), (double)newestOk);
+   if(failed > 0) Log("sync state not advanced because one or more deals failed; they will be retried on the next check.");
    Log("history check complete: deals=" + IntegerToString(total) + ", attempted=" + IntegerToString(attempted) + ", synced=" + IntegerToString(synced) + ", already_present=" + IntegerToString(duplicates) + ", failed=" + IntegerToString(failed));
 }
 
