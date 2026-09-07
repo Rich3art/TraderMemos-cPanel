@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type { SetupAttachment, TradeDetail } from "./api/types";
 
 export type ModalKind = "new-trade" | "new-setup" | "new-note" | "new-guide";
+export type SetupDirection = "long" | "short" | "unknown";
 
 /** Prefill payload when converting a setup → New Trade. */
 export interface TradeDraft {
@@ -19,7 +20,7 @@ export interface SetupDraft {
   name: string;
   thesis: string;
   symbol: string;
-  direction: "long" | "short";
+  direction: SetupDirection;
   target: string;
   stop: string;
   checklistText: string;

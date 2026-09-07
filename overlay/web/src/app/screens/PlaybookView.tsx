@@ -12,6 +12,7 @@ import {
   ListFilter,
   Pencil,
   Plus,
+  CircleHelp,
   Trash2,
   X,
 } from "lucide-react";
@@ -107,7 +108,12 @@ function toSetupDraft(setup: Setup): SetupDraft {
     name: setup.name,
     thesis: setup.thesis || setup.description || "",
     symbol: setup.symbol || "",
-    direction: setup.direction === "short" ? "short" : "long",
+    direction:
+      setup.direction === "short"
+        ? "short"
+        : setup.direction === "long"
+          ? "long"
+          : "unknown",
     target: setup.target_price != null ? String(setup.target_price) : "",
     stop: setup.stop_price != null ? String(setup.stop_price) : "",
     checklistText: (setup.checklist ?? []).join("\n"),
@@ -225,7 +231,9 @@ function PlayIcon({
   chip?: boolean;
 }) {
   const Icon = setup.direction
-    ? setup.direction === "short"
+    ? setup.direction === "unknown"
+      ? CircleHelp
+      : setup.direction === "short"
       ? ArrowDownRight
       : ArrowUpRight
     : BookOpen;
@@ -400,6 +408,8 @@ function TradedPlayRow({ row, currency, fxRate, ...actions }: PlayRowProps) {
   const { setup, trades, wins, losses, winRate, netPnl, pf, exp } = row;
   const subline = setupSubline(setup);
   const money = (v: number) => fmtSignedMoney(v * fxRate, currency, locale);
+  const directionLabel =
+    setup.direction === "short" ? "SHORT" : setup.direction === "long" ? "LONG" : "?";
 
   return (
     <div
@@ -432,7 +442,7 @@ function TradedPlayRow({ row, currency, fxRate, ...actions }: PlayRowProps) {
             {setup.symbol ? (
               <Pill tone="accent" className="px-1.5 py-0 text-[10px]">
                 {setup.symbol}
-                {setup.direction ? ` · ${setup.direction.toUpperCase()}` : ""}
+                {setup.direction ? ` · ${directionLabel}` : ""}
               </Pill>
             ) : null}
           </div>
@@ -655,10 +665,21 @@ export function PlaybookView({
   }
 
   function convertSetup(setup: Setup) {
+    let side: "long" | "short" | undefined =
+      setup.direction === "short" ? "short" : setup.direction === "long" ? "long" : undefined;
+    if (!side) {
+      const answer = window.prompt(
+        `Choose direction for "${setup.name}" before creating the trade: long or short`,
+        "",
+      );
+      const normalized = answer?.trim().toLowerCase();
+      if (normalized !== "long" && normalized !== "short") return;
+      side = normalized;
+    }
     openTradeFromSetup({
       setupId: setup.id,
       symbol: setup.symbol || undefined,
-      side: setup.direction === "short" ? "short" : setup.direction === "long" ? "long" : undefined,
+      side,
       target: setup.target_price != null ? String(setup.target_price) : undefined,
       stop: setup.stop_price != null ? String(setup.stop_price) : undefined,
       notes: setup.thesis || setup.description || undefined,

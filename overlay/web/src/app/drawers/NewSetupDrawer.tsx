@@ -35,7 +35,7 @@ import {
 } from "@/lib/hooks/useSetups";
 import { snapChartTime, useMarketBars } from "@/lib/hooks/useMarketBars";
 import { inferMarketFromSymbol } from "@/lib/marketInference";
-import { useUI } from "@/lib/ui";
+import { type SetupDirection, useUI } from "@/lib/ui";
 
 /** Checklist textarea → one trimmed item per non-empty line. */
 function parseChecklist(text: string): string[] {
@@ -49,7 +49,7 @@ const EMPTY_VALUES = {
   name: "",
   thesis: "",
   symbol: "",
-  direction: "long" as "long" | "short",
+  direction: "long" as SetupDirection,
   target: "",
   stop: "",
   checklistText: "",
@@ -66,7 +66,7 @@ function valuesFromDraft(draft: NonNullable<ReturnType<typeof useUI.getState>["s
     name: draft.name,
     thesis: draft.thesis,
     symbol: draft.symbol,
-    direction: draft.direction,
+    direction: draft.direction || "unknown",
     target: draft.target,
     stop: draft.stop,
     checklistText: draft.checklistText,
@@ -323,9 +323,10 @@ export function NewSetupDrawer() {
                       size="md"
                       fullWidth
                       value={field.state.value}
-                      onChange={(v) => field.handleChange(v as "long" | "short")}
+                      onChange={(v) => field.handleChange(v as SetupDirection)}
                       options={[
                         { value: "long", label: "↗ LONG" },
+                        { value: "unknown", label: "? UNKNOWN" },
                         { value: "short", label: "↘ SHORT" },
                       ]}
                       tones={{ long: "pos", short: "neg" }}

@@ -94,6 +94,25 @@ describe("NewSetupDrawer", () => {
     await waitFor(() => expect(useUI.getState().modal).toBeNull());
   });
 
+  it("creates a setup with unknown direction", async () => {
+    mockedCreate.mockResolvedValue({ id: "s1" } as never);
+    wrap(<NewSetupDrawer />);
+
+    await userEvent.type(screen.getByLabelText("Name"), "Undecided Breakout");
+    await userEvent.click(screen.getByRole("button", { name: /\? unknown/i }));
+    await userEvent.click(screen.getByRole("button", { name: /save setup/i }));
+
+    await waitFor(() =>
+      expect(mockedCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "Undecided Breakout",
+          direction: "unknown",
+        }),
+        expect.anything(),
+      ),
+    );
+  });
+
   it("validates the name", async () => {
     wrap(<NewSetupDrawer />);
     await userEvent.click(screen.getByRole("button", { name: /save setup/i }));

@@ -138,6 +138,8 @@ func normalizeDirection(d string) string {
 		return "long"
 	case "short":
 		return "short"
+	case "unknown", "?":
+		return "unknown"
 	default:
 		return ""
 	}
@@ -148,6 +150,10 @@ func (s *Server) handleCreateSetup(c *echo.Context) error {
 	if err := c.Bind(&in); err != nil || strings.TrimSpace(in.Name) == "" {
 		return Fail(http.StatusBadRequest, "bad_request", "name is required", nil)
 	}
+	direction := normalizeDirection(in.Direction)
+	if strings.TrimSpace(in.Direction) != "" && direction == "" {
+		return Fail(http.StatusBadRequest, "bad_request", "direction must be long, short, or unknown", nil)
+	}
 	setup, err := s.deps.Store.CreateSetup(c.Request().Context(), store.CreateSetupParams{
 		ID:          uuid.New().String(),
 		UserID:      auth.UserID(c),
@@ -155,7 +161,7 @@ func (s *Server) handleCreateSetup(c *echo.Context) error {
 		Description: in.Description,
 		Thesis:      in.Thesis,
 		Symbol:      strings.ToUpper(strings.TrimSpace(in.Symbol)),
-		Direction:   normalizeDirection(in.Direction),
+		Direction:   direction,
 		TargetPrice: nullF(in.TargetPrice),
 		StopPrice:   nullF(in.StopPrice),
 		Checklist:   encodeChecklist(in.Checklist),
@@ -195,12 +201,16 @@ func (s *Server) handleUpdateSetup(c *echo.Context) error {
 	}
 	userID := auth.UserID(c)
 	id := c.Param("id")
+	direction := normalizeDirection(in.Direction)
+	if strings.TrimSpace(in.Direction) != "" && direction == "" {
+		return Fail(http.StatusBadRequest, "bad_request", "direction must be long, short, or unknown", nil)
+	}
 	if err := s.deps.Store.UpdateSetup(c.Request().Context(), store.UpdateSetupParams{
 		Name:        strings.TrimSpace(in.Name),
 		Description: in.Description,
 		Thesis:      in.Thesis,
 		Symbol:      strings.ToUpper(strings.TrimSpace(in.Symbol)),
-		Direction:   normalizeDirection(in.Direction),
+		Direction:   direction,
 		TargetPrice: nullF(in.TargetPrice),
 		StopPrice:   nullF(in.StopPrice),
 		Checklist:   encodeChecklist(in.Checklist),
