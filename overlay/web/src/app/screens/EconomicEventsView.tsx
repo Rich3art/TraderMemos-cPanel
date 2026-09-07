@@ -101,6 +101,9 @@ function needsWideTimeColumn(locale: string): boolean {
 
 function providerLabel(provider: string): string {
   if (provider === "faireconomy" || provider === "forexfactory") return "Forex Factory";
+  if (provider === "official-us") return "Official U.S. sources";
+  if (provider === "bls") return "U.S. Bureau of Labor Statistics";
+  if (provider === "bea") return "U.S. Bureau of Economic Analysis";
   return provider || "Economic calendar";
 }
 
@@ -108,7 +111,9 @@ function providerUrl(provider: string): string {
   if (provider === "faireconomy" || provider === "forexfactory") {
     return "https://www.forexfactory.com/calendar";
   }
-  return "https://www.forexfactory.com/calendar";
+  if (provider === "bls") return "https://www.bls.gov/schedule/news_release/";
+  if (provider === "bea") return "https://www.bea.gov/news/schedule";
+  return "https://www.bls.gov/schedule/news_release/";
 }
 
 function parseNumericFigure(value: string): number | null {
@@ -419,6 +424,13 @@ export function EconomicEventsView({
         </div>
       </div>
       <Card flush>{renderContent()}</Card>
+      {events.some((ev) => ev.provider === "official-us" || ev.provider === "bls") ? (
+        <p className="px-1 text-[11px] leading-4 text-muted-foreground">
+          Source includes U.S. Bureau of Labor Statistics public data. BLS.gov cannot vouch
+          for the data or analyses derived from these data after they have been retrieved
+          from BLS.gov.
+        </p>
+      ) : null}
       <EventDetailDrawer
         event={selected}
         now={now}
