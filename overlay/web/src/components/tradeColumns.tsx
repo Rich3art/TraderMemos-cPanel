@@ -1,5 +1,6 @@
 import type { ColumnDef, ColumnPinningState } from "@/lib/table";
 import type { Trade } from "@/lib/api/types";
+import type { ConvertMoney } from "@/lib/currencyConversion";
 import { usePrivacyMode } from "@/lib/displayPrefs";
 import { fmtDateTime, fmtDuration, fmtMoney, fmtSignedMoney, fmtTradeDay } from "@/lib/format";
 import { intlLocale } from "@/lib/locale";
@@ -13,16 +14,24 @@ export type { TradeRowActions };
 
 const MARKET_LABELS: Record<string, string> = {
   stock: "STK",
+  etf: "ETF",
+  commodity: "COM",
+  cfd: "CFD",
   option: "OPT",
   crypto: "CRY",
+  future: "FUT",
   futures: "FUT",
   forex: "FX",
 };
 
 const MARKET_TITLES: Record<string, string> = {
   stock: "Stock",
+  etf: "ETF",
+  commodity: "Commodities",
+  cfd: "CFD",
   option: "Option",
   crypto: "Crypto",
+  future: "Futures",
   futures: "Futures",
   forex: "Forex",
 };
@@ -71,15 +80,18 @@ function muted(v: string, title?: string) {
 function MoneyCell({
   value,
   currency,
-  fxRate = 1,
+  sourceCurrency,
+  convert,
 }: {
   value: number | null;
   currency: string;
-  fxRate?: number;
+  sourceCurrency?: string;
+  convert?: ConvertMoney;
 }) {
   usePrivacyMode();
   if (value == null) return muted("-");
-  const text = fmtMoney(value * fxRate, currency, intlLocale());
+  const amount = convert ? convert(value, sourceCurrency) : value;
+  const text = fmtMoney(amount, currency, intlLocale());
   return (
     <span className="tabular-nums" title={text}>
       {text}
@@ -103,14 +115,16 @@ function PriceCell({ value }: { value: number | null }) {
 function SignedMoneyCell({
   value,
   currency,
-  fxRate = 1,
+  sourceCurrency,
+  convert,
 }: {
   value: number;
   currency: string;
-  fxRate?: number;
+  sourceCurrency?: string;
+  convert?: ConvertMoney;
 }) {
   usePrivacyMode();
-  const text = fmtSignedMoney(value * fxRate, currency, intlLocale());
+  const text = fmtSignedMoney(convert ? convert(value, sourceCurrency) : value, currency, intlLocale());
   return (
     <span className={`tabular-nums font-semibold ${pnlColor(value)}`} title={text}>
       {text}
@@ -121,8 +135,10 @@ function SignedMoneyCell({
 export function tradeColumns(
   currency: string,
   actions: TradeRowActions,
-  fxRate = 1,
+  fxRateOrConvert: number | ConvertMoney = 1,
 ): ColumnDef<Trade>[] {
+  const convert: ConvertMoney =
+    typeof fxRateOrConvert === "function" ? fxRateOrConvert : (value) => value * fxRateOrConvert;
   return [
     {
       accessorKey: "symbol",
@@ -227,7 +243,8 @@ export function tradeColumns(
           <MoneyCell
             value={tradeNotional(t.qty_opened, t.avg_entry_price, t.instrument_type)}
             currency={currency}
-            fxRate={fxRate}
+            sourceCurrency={t.pnl_currency}
+            convert={convert}
           />
         );
       },
@@ -265,7 +282,8 @@ export function tradeColumns(
           <MoneyCell
             value={tradeNotional(t.qty_opened, t.avg_exit_price, t.instrument_type)}
             currency={currency}
-            fxRate={fxRate}
+            sourceCurrency={t.pnl_currency}
+            convert={convert}
           />
         );
       },
@@ -321,7 +339,14 @@ export function tradeColumns(
         headerTitle: "Total fees and commissions",
         minWidth: 72,
       },
-      cell: (i) => <MoneyCell value={i.getValue<number>()} currency={currency} fxRate={fxRate} />,
+      cell: (i) => (
+        <MoneyCell
+          value={i.getValue<number>()}
+          currency={currency}
+          sourceCurrency={i.row.original.pnl_currency}
+          convert={convert}
+        />
+      ),
     },
     {
       accessorKey: "net_pnl",
@@ -330,7 +355,14 @@ export function tradeColumns(
       cell: (i) => {
         const v = i.getValue<number | null>();
         if (v == null) return muted("-");
-        return <SignedMoneyCell value={v} currency={currency} fxRate={fxRate} />;
+        return (
+          <SignedMoneyCell
+            value={v}
+            currency={currency}
+            sourceCurrency={i.row.original.pnl_currency}
+            convert={convert}
+          />
+        );
       },
     },
     {

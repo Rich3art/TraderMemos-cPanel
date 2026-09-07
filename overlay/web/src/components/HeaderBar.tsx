@@ -2,6 +2,13 @@ import { useRouterState } from "@tanstack/react-router";
 import { Eye, EyeOff, Search, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/cn";
+import {
+  cashCurrencies,
+  convertCashMoney,
+  convertTradeMoney,
+  summarizeTradesForDisplay,
+  tradeCurrencies,
+} from "@/lib/currencyConversion";
 import { currencyIcon, currencyName, currencyRegion, currencySymbol } from "@/lib/currency";
 import {
   accountBaseCurrency,
@@ -16,6 +23,7 @@ import { computeHeaderStats } from "@/lib/headerStats";
 import { useAccounts } from "@/lib/hooks/useAccounts";
 import { useSummary } from "@/lib/hooks/useAnalytics";
 import { useCash } from "@/lib/hooks/useCash";
+import { useCurrencyConverter } from "@/lib/hooks/useCurrencyConverter";
 import { useMoneyFx } from "@/lib/hooks/useMoneyFx";
 import { useTrades } from "@/lib/hooks/useTrades";
 import { intlLocale } from "@/lib/locale";
@@ -267,15 +275,27 @@ export function HeaderBar() {
   const cashQ = useCash(filters);
 
   const baseCurrency = accountBaseCurrency(accounts, accountIds);
-  const { currency, toDisplay, isLoading: fxLoading } = useMoneyFx(baseCurrency);
+  const { currency } = useMoneyFx(baseCurrency);
+  const sourceCurrencies = [
+    ...tradeCurrencies(tradesQ.data ?? []),
+    ...cashCurrencies(cashQ.data ?? []),
+  ];
+  const moneyFx = useCurrencyConverter(currency, sourceCurrencies);
+  const displayTrades = (tradesQ.data ?? []).map((trade) =>
+    convertTradeMoney(trade, currency, moneyFx.convert),
+  );
+  const displayCash = (cashQ.data ?? []).map((tx) =>
+    convertCashMoney(tx, currency, moneyFx.convert),
+  );
+  const displaySummary = summarizeTradesForDisplay(displayTrades, summaryQ.data);
   const stats = computeHeaderStats({
     accounts,
     accountIds,
-    cashTx: cashQ.data ?? [],
-    summary: summaryQ.data,
-    trades: tradesQ.data ?? [],
+    cashTx: displayCash,
+    summary: displaySummary,
+    trades: displayTrades,
   });
-  const summary = summaryQ.data;
+  const summary = displaySummary;
   // Only judge staleness against a LOADED account list — before the query
   // resolves every persisted id would look deleted and the scope would clear
   // on each reload.
@@ -322,10 +342,10 @@ export function HeaderBar() {
           className={cn(
             heroPnlClass(stats.netPnl),
             "flex shrink-0 items-baseline gap-1.5 text-[17px] sm:text-[20px]",
-            fxLoading && "opacity-60",
+            moneyFx.isLoading && "opacity-60",
           )}
         >
-          <RollingNumber value={fmtSignedMoney(toDisplay(stats.netPnl), currency, intlLocale())} />
+          <RollingNumber value={fmtSignedMoney(stats.netPnl, currency, intlLocale())} />
           {stats.netPnlPct != null ? (
             <RollingNumber
               value={fmtSignedPct(stats.netPnlPct, intlLocale())}
@@ -344,7 +364,7 @@ export function HeaderBar() {
           <StatDivider />
           <HeaderStat
             label="Balance"
-            value={fmtMoney(toDisplay(stats.cash), currency, intlLocale())}
+            value={fmtMoney(stats.cash, currency, intlLocale())}
           />
         </div>
         {symbols?.length && !onTradesPage ? (
