@@ -11,7 +11,13 @@ import { Item, ItemContent, ItemTitle } from "./Item";
 import { Pill } from "./Pill";
 import { outlineSurfaceClass } from "./surface-styles";
 import { pnlColor } from "./theme-tokens";
-import { marketLabel, tradeNotional, tradeRMultiple, tradeStatus } from "./tradeColumns";
+import {
+  marketLabel,
+  tradeNotional,
+  tradeRMultiple,
+  tradeStatus,
+  usesPriceTotal,
+} from "./tradeColumns";
 
 /** Tags beyond this get rolled into a "+N", as in the table's Tags column. */
 const MAX_TAGS = 2;
@@ -62,9 +68,17 @@ export function tradeListPrices(
       ? fxRateOrConvert
       : (value) => value * fxRateOrConvert;
   const qty = trade.qty_opened.toFixed(trade.qty_opened % 1 === 0 ? 0 : 2);
-  const entry = fmtMoney(convert(trade.avg_entry_price, trade.pnl_currency), currency, locale);
+  const formatPrice = (value: number) =>
+    value.toLocaleString(locale, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 8,
+    });
+  const formatValue = usesPriceTotal(trade.instrument_type)
+    ? formatPrice
+    : (value: number) => fmtMoney(convert(value, trade.pnl_currency), currency, locale);
+  const entry = formatValue(trade.avg_entry_price);
   if (trade.avg_exit_price == null) return `${qty} @ ${entry}`;
-  return `${qty} @ ${entry} → ${fmtMoney(convert(trade.avg_exit_price, trade.pnl_currency), currency, locale)}`;
+  return `${qty} @ ${entry} → ${formatValue(trade.avg_exit_price)}`;
 }
 
 export interface TradeListItemProps {
@@ -200,8 +214,10 @@ export function TradeListItem({
             <span className="text-muted-foreground @max-[19rem]/trade-row:hidden">
               {" · "}
               {fmtMoney(
-                tradeNotional(trade.qty_opened, trade.avg_entry_price, trade.instrument_type) *
-                  convert(1, trade.pnl_currency),
+                convert(
+                  tradeNotional(trade.qty_opened, trade.avg_entry_price, trade.instrument_type),
+                  trade.pnl_currency,
+                ),
                 currency,
                 intlLocale(),
               )}

@@ -49,7 +49,7 @@ export function tradeNotional(qty: number, price: number, instrumentType: string
   return qty * price * tradeNotionalMultiplier(instrumentType);
 }
 
-function usesPriceTotal(instrumentType: string): boolean {
+export function usesPriceTotal(instrumentType: string): boolean {
   return instrumentType === "forex" || instrumentType === "crypto" || instrumentType === "cfd";
 }
 
