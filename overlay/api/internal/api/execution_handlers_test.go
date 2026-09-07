@@ -166,3 +166,30 @@ func TestCreateExecutionUsesMetaTraderAccountCurrency(t *testing.T) {
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &account))
 	require.Equal(t, "ZAR", account["base_currency"])
 }
+
+func TestCreateExecutionKeepsMetaTraderPricesAndChangePercent(t *testing.T) {
+	s := testServer(t)
+	tok := registerAndLogin(t, s, "mt-prices@x.com")
+	acc := accountID(t, s, tok)
+
+	open := `{"account_id":"` + acc + `","symbol":"USDCAD","instrument_type":"forex","side":"sell","quantity":0.01,"price":1.37595,"executed_at":"2026-08-21T10:57:00Z","multiplier":100000,"details":{"source":"metatrader5","account_currency":"ZAR","broker_profit":"0","lot":"mt5-position-170321463"}}`
+	close := `{"account_id":"` + acc + `","symbol":"USDCAD","instrument_type":"forex","side":"buy","quantity":0.01,"price":1.38180,"fees":1,"executed_at":"2026-08-24T00:01:00Z","multiplier":100000,"details":{"source":"metatrader5","account_currency":"ZAR","broker_profit":"-67.77","lot":"mt5-position-170321463"}}`
+	require.Equal(t, http.StatusCreated, do(s, http.MethodPost, "/api/v1/executions", open, tok).Code)
+	rec := do(s, http.MethodPost, "/api/v1/executions", close, tok)
+	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
+
+	var created struct {
+		TradeID string `json:"trade_id"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &created))
+	rec = do(s, http.MethodGet, "/api/v1/trades/"+created.TradeID, "", tok)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	var trade map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &trade))
+	require.Equal(t, 1.37595, trade["avg_entry_price"])
+	require.Equal(t, 1.3818, trade["avg_exit_price"])
+	require.Equal(t, -67.77, trade["net_pnl"])
+	require.Equal(t, -0.43, trade["return_pct"])
+	require.Equal(t, 1.0, trade["fees_total"])
+	require.Equal(t, -66.77, trade["gross_pnl"])
+}

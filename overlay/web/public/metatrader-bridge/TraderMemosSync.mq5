@@ -1,7 +1,7 @@
 // TraderMemosSync.mq5
 // Attach this Expert Advisor to any MT5 chart to send filled deals to TraderMemos.
 #property strict
-#property version "1.15"
+#property version "1.16"
 
 input string TraderMemosServer = "https://journal.ranksmedia.com";
 input string TraderMemosToken = "";
@@ -136,6 +136,11 @@ int PostExecution(ulong ticket)
       Log("WebRequest failed for deal " + IntegerToString((long)ticket) + " with error " + IntegerToString(error) + ". In MT5 add " + TraderMemosServer + " under Tools > Options > Expert Advisors > Allow WebRequest.");
       return -1;
    }
+   if(status < 100 || status > 599)
+   {
+      Log("WebRequest returned non-HTTP status " + IntegerToString(status) + " for deal " + IntegerToString((long)ticket) + ". The trade was not accepted by the journal yet and will be retried.");
+      return -1;
+   }
    Log("server rejected deal " + IntegerToString((long)ticket) + " with HTTP " + IntegerToString(status) + ": " + ResponseText(result));
    return -1;
 }
@@ -201,6 +206,11 @@ int PostCashMovement(ulong ticket)
    {
       int error = GetLastError();
       Log("WebRequest failed for cash movement " + IntegerToString((long)ticket) + " with error " + IntegerToString(error) + ". In MT5 add " + TraderMemosServer + " under Tools > Options > Expert Advisors > Allow WebRequest.");
+      return -1;
+   }
+   if(status < 100 || status > 599)
+   {
+      Log("WebRequest returned non-HTTP status " + IntegerToString(status) + " for cash movement " + IntegerToString((long)ticket) + ". The movement was not accepted by the journal yet and will be retried.");
       return -1;
    }
    Log("server rejected cash movement " + IntegerToString((long)ticket) + " with HTTP " + IntegerToString(status) + ": " + ResponseText(result));

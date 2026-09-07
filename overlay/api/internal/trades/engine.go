@@ -1,6 +1,7 @@
 package trades
 
 import (
+	"math"
 	"sort"
 	"time"
 
@@ -187,18 +188,18 @@ func (s *openState) finalize(closedAt time.Time) Trade {
 	net := money.Round2(gross - s.feesTotal)
 	ret := 0.0
 	if s.hasBrokerGross {
-		gross = money.Round2(s.brokerGross)
-		net = money.Round2(gross - s.feesTotal)
+		net = money.Round2(s.brokerGross)
+		gross = money.Round2(net + s.feesTotal)
 	}
-	if base := avgEntry * s.exitQty * mult; base != 0 {
-		ret = money.Round2(net / base * 100)
+	if avgEntry != 0 {
+		ret = roundPct((avgExit - avgEntry) / avgEntry * dirSign * 100)
 	}
 	secs := int64(closedAt.Sub(s.openedAt).Seconds())
 	return Trade{
 		Symbol: s.symbol, InstrumentType: s.instrument, Direction: s.direction,
 		Status: "closed", OpenedAt: s.openedAt, ClosedAt: &closedAt,
-		QtyOpened: s.qtyOpened, QtyRemaining: 0, AvgEntryPrice: money.Round2(avgEntry),
-		AvgExitPrice: f64(money.Round2(avgExit)), GrossPnl: f64(gross),
+		QtyOpened: s.qtyOpened, QtyRemaining: 0, AvgEntryPrice: roundPrice(avgEntry),
+		AvgExitPrice: f64(roundPrice(avgExit)), GrossPnl: f64(gross),
 		FeesTotal: money.Round2(s.feesTotal), NetPnl: f64(net), ReturnPct: f64(ret),
 		TimeInTradeSecs: &secs, ExecutionIDs: s.execIDs,
 	}
@@ -210,12 +211,20 @@ func (s *openState) finalizeOpen() Trade {
 		Symbol: s.symbol, InstrumentType: s.instrument, Direction: s.direction,
 		Status: "open", OpenedAt: s.openedAt, QtyOpened: s.qtyOpened,
 		QtyRemaining:  money.Round2(abs(s.position)),
-		AvgEntryPrice: money.Round2(avgEntry), FeesTotal: money.Round2(s.feesTotal),
+		AvgEntryPrice: roundPrice(avgEntry), FeesTotal: money.Round2(s.feesTotal),
 		ExecutionIDs: s.execIDs,
 	}
 }
 
 func f64(v float64) *float64 { return &v }
+
+func roundPrice(v float64) float64 {
+	return math.Round(v*100000000) / 100000000
+}
+
+func roundPct(v float64) float64 {
+	return math.Round(v*100) / 100
+}
 
 func abs(v float64) float64 {
 	if v < 0 {
