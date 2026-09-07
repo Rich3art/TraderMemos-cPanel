@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft, Pencil, RefreshCw } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Card } from "@/components/Card";
 import { EmptyState } from "@/components/EmptyState";
 import { FlexSyncButton } from "@/components/FlexSyncModal";
@@ -17,6 +17,12 @@ import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { flexSyncFailed } from "@/lib/api/flexSync";
 import type { Account } from "@/lib/api/types";
 import { cn } from "@/lib/cn";
+import {
+  cashCurrencies,
+  convertCashMoney,
+  convertTradeMoney,
+  tradeCurrencies,
+} from "@/lib/currencyConversion";
 import { CURRENCY_OPTIONS } from "@/lib/currency";
 import { usePrivacyMode } from "@/lib/displayPrefs";
 import { fmtMoney, fmtSignedMoney } from "@/lib/format";
@@ -27,6 +33,7 @@ import {
   useUpdateAccount,
 } from "@/lib/hooks/useAccounts";
 import { useCash } from "@/lib/hooks/useCash";
+import { useCurrencyConverter } from "@/lib/hooks/useCurrencyConverter";
 import { useFlexSync, useRunFlexSync } from "@/lib/hooks/useFlexSync";
 import { useTrades } from "@/lib/hooks/useTrades";
 import { intlLocale } from "@/lib/locale";
@@ -277,6 +284,21 @@ export function AccountDetailView({
   const cashQ = useCash({ account_id: accountId });
   const deleteAccount = useDeleteAccount();
   const clearTrades = useClearAccountTrades();
+  const trades = tradesQ.data ?? [];
+  const cashTx = cashQ.data ?? [];
+  const accountCurrency = account?.base_currency?.trim().toUpperCase() || "USD";
+  const moneyFx = useCurrencyConverter(accountCurrency, [
+    ...tradeCurrencies(trades),
+    ...cashCurrencies(cashTx),
+  ]);
+  const displayTrades = useMemo(
+    () => trades.map((trade) => convertTradeMoney(trade, accountCurrency, moneyFx.convert)),
+    [accountCurrency, moneyFx.convert, trades],
+  );
+  const displayCash = useMemo(
+    () => cashTx.map((tx) => convertCashMoney(tx, accountCurrency, moneyFx.convert)),
+    [accountCurrency, cashTx, moneyFx.convert],
+  );
 
   if (accountsQ.isLoading) return <Page>{null}</Page>;
   if (!account) {
@@ -296,10 +318,9 @@ export function AccountDetailView({
     );
   }
 
-  const trades = tradesQ.data ?? [];
-  const netPnl = trades.reduce((sum, t) => sum + (t.net_pnl ?? 0), 0);
+  const netPnl = displayTrades.reduce((sum, t) => sum + (t.net_pnl ?? 0), 0);
   const tradeCount = trades.length;
-  const balance = ledgerBalance(account, cashQ.data ?? []);
+  const balance = ledgerBalance({ ...account, base_currency: accountCurrency }, displayCash);
   const equity = balance + netPnl;
   const locale = intlLocale();
   const isPrimary = account.id === primaryAccountId(accounts);
@@ -347,11 +368,11 @@ export function AccountDetailView({
 
       <Card>
         <div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3">
-          <Stat label="Deposited" value={fmtMoney(balance, account.base_currency, locale)} />
-          <Stat label="Equity" value={fmtMoney(equity, account.base_currency, locale)} />
+          <Stat label="Deposited" value={fmtMoney(balance, accountCurrency, locale)} />
+          <Stat label="Equity" value={fmtMoney(equity, accountCurrency, locale)} />
           <Stat
             label="Realized P&L"
-            value={`${fmtSignedMoney(netPnl, account.base_currency, locale)}${pnlPct ? ` (${pnlPct})` : ""}`}
+            value={`${fmtSignedMoney(netPnl, accountCurrency, locale)}${pnlPct ? ` (${pnlPct})` : ""}`}
             className={
               netPnl > 0 ? "text-profit" : netPnl < 0 ? "text-destructive" : "text-muted-foreground"
             }

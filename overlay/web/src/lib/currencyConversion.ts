@@ -1,4 +1,4 @@
-import type { CashTransaction, Summary, Trade } from "./api/types";
+import type { CashTransaction, Summary, Trade, TradeDetail } from "./api/types";
 
 export type ConvertMoney = (amount: number, fromCurrency?: string | null) => number;
 
@@ -30,6 +30,27 @@ export function convertTradeMoney<T extends Trade>(
     net_pnl: money(trade.net_pnl) ?? null,
     initial_risk: money(trade.initial_risk) ?? null,
     pnl_currency: targetCurrency,
+  };
+}
+
+export function convertTradeDetailMoney<T extends TradeDetail>(
+  trade: T,
+  targetCurrency: string,
+  convert: ConvertMoney,
+): T {
+  const converted = convertTradeMoney(trade, targetCurrency, convert);
+  const from = normalizeCurrency(trade.pnl_currency, targetCurrency);
+  const money = (value: number | null | undefined) =>
+    value == null ? value : Math.round(convert(value, from) * 100) / 100;
+  return {
+    ...converted,
+    dividend_total: money(trade.dividend_total) ?? 0,
+    total_pnl: money(trade.total_pnl) ?? null,
+    fills: trade.fills.map((fill) => ({
+      ...fill,
+      fees: money(fill.fees) ?? 0,
+      commission: money(fill.commission) ?? 0,
+    })),
   };
 }
 

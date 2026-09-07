@@ -1,0 +1,450 @@
+import { useNavigate } from "@tanstack/react-router";
+import { ExternalLink, Trash2, X, Zap } from "lucide-react";
+import { useId, useMemo, useState } from "react";
+import { TradeChartSection } from "./charts/TradeChartSection";
+import { RiskRewardPanel } from "./RiskRewardPanel";
+import {
+  Drawer,
+  DrawerBody,
+  DrawerClose,
+  DrawerContent,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+} from "./Drawer";
+import { Modal } from "./Modal";
+import { Skeleton } from "./Skeleton";
+import { Pill } from "./Pill";
+import { cardSectionLabelClass } from "./StatCell";
+import { FormInput } from "./FormInput";
+import { useToastManager } from "./Toast";
+import { heroPnlClass, pnlColor } from "./theme-tokens";
+import { marketLabel, tradeStatus } from "./tradeColumns";
+import { formatOptionMarketChip, optionContractFromFills } from "@/lib/optionContract";
+import { Button } from "./ui/button";
+import { cn } from "@/lib/cn";
+import type { TradeDetail } from "@/lib/api/types";
+import { fmtDateTime, fmtMoney, fmtSignedMoney } from "@/lib/format";
+import { intlLocale } from "@/lib/locale";
+import { useDeleteTrade, useTradeDetail } from "@/lib/hooks/useTradeDetail";
+import { computeRiskReward } from "@/lib/riskReward";
+import { useDisplayTimePrefs, usePrivacyMode } from "@/lib/displayPrefs";
+import { convertTradeDetailMoney, tradeCurrencies } from "@/lib/currencyConversion";
+import { useCurrencyConverter } from "@/lib/hooks/useCurrencyConverter";
+import { useMoneyFx } from "@/lib/hooks/useMoneyFx";
+
+export interface TradeDetailSheetProps {
+  tradeId: string | null;
+  onClose: () => void;
+}
+
+const sectionLabelClass = cn(cardSectionLabelClass, "mb-2");
+
+export function TradeDetailSheet({ tradeId, onClose }: TradeDetailSheetProps) {
+  const navigate = useNavigate();
+  const toast = useToastManager();
+  const open = Boolean(tradeId);
+  const detailQ = useTradeDetail(tradeId ?? "");
+  const deleteTrade = useDeleteTrade();
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [typedConfirm, setTypedConfirm] = useState("");
+  const confirmInputId = useId();
+
+  const rawTrade = detailQ.data;
+  const { currency: displayCurrency } = useMoneyFx(rawTrade?.pnl_currency ?? "USD");
+  const moneyFx = useCurrencyConverter(
+    displayCurrency,
+    rawTrade ? tradeCurrencies([rawTrade]) : [],
+  );
+  const trade = useMemo(
+    () =>
+      rawTrade ? convertTradeDetailMoney(rawTrade, displayCurrency, moneyFx.convert) : undefined,
+    [displayCurrency, moneyFx.convert, rawTrade],
+  );
+  // "OPT · 115 CALL · 2026-07-22 · LONG" as separate parts — the market chip
+  // already joins its own pieces with the same dot, so split it back apart and
+  // let the header re-join them with wrap points between each.
+  const headerMeta = trade
+    ? [
+        ...formatOptionMarketChip(
+          trade.instrument_type,
+          marketLabel(trade.instrument_type),
+          optionContractFromFills(trade.fills),
+        ).split(" · "),
+        trade.direction.toUpperCase(),
+      ]
+    : [];
+  const canDelete =
+    trade != null && typedConfirm.trim().toUpperCase() === trade.symbol.trim().toUpperCase();
+
+  const openFullPage = () => {
+    if (!tradeId) return;
+    void navigate({ to: "/trades/$id", params: { id: tradeId } });
+    onClose();
+  };
+
+  const closeDeleteModal = (next: boolean) => {
+    setDeleteOpen(next);
+    if (!next) setTypedConfirm("");
+  };
+
+  const handleDelete = async () => {
+    if (!tradeId || !trade) return;
+    try {
+      await deleteTrade.mutateAsync(tradeId);
+      toast.add({ title: "Trade removed", description: trade.symbol });
+      closeDeleteModal(false);
+      onClose();
+    } catch {
+      toast.add({
+        title: "Could not remove trade",
+        description: "Try again in a moment",
+      });
+    }
+  };
+
+  return (
+    <Drawer
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) onClose();
+      }}
+      modal="trap-focus"
+    >
+      <DrawerContent>
+        <DrawerHeader className="px-4 py-3">
+          <DrawerTitle className="flex min-w-0 flex-col gap-0.5">
+            {trade ? (
+              <>
+                <span className="truncate text-[15px] leading-tight font-semibold tracking-tight">
+                  {trade.symbol}
+                </span>
+                {/* Contract details wrap part-by-part rather than mid-token, so a
+                    narrow drawer never splits an expiry date across two lines. */}
+                <span className="flex flex-wrap items-center text-[11px] leading-tight font-medium text-muted-foreground">
+                  {headerMeta.map((part, i) => (
+                    <span key={`${part}-${i}`} className="whitespace-nowrap">
+                      {i > 0 ? (
+                        <span aria-hidden className="px-1 text-muted-foreground/50">
+                          ·
+                        </span>
+                      ) : null}
+                      {part}
+                    </span>
+                  ))}
+                </span>
+              </>
+            ) : (
+              "Trade"
+            )}
+          </DrawerTitle>
+          <div className="ml-auto flex shrink-0 items-center gap-1">
+            {tradeId && (
+              <Button
+                type="button"
+                variant="soft"
+                size="xs"
+                onClick={openFullPage}
+                className="gap-1.5"
+              >
+                <ExternalLink size={12} strokeWidth={1.5} />
+                Open full page
+              </Button>
+            )}
+            <DrawerClose
+              aria-label="Close"
+              className="flex cursor-pointer rounded-md border-none bg-transparent p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              <X size={18} strokeWidth={1.5} />
+            </DrawerClose>
+          </div>
+        </DrawerHeader>
+        <DrawerBody className="gap-0 p-0">
+          {detailQ.isLoading && (
+            <div className="flex flex-col gap-3 p-4">
+              <Skeleton height="24px" width="60%" />
+              <Skeleton height="140px" />
+              <Skeleton height="200px" />
+              <Skeleton height="72px" />
+            </div>
+          )}
+          {detailQ.isError && (
+            <p className="p-4 text-sm text-muted-foreground">Could not load trade detail.</p>
+          )}
+          {trade && <TradeDetailSheetBody trade={trade} onOpenFullPage={openFullPage} />}
+        </DrawerBody>
+        {trade ? (
+          <DrawerFooter className="px-4 pt-3">
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={deleteTrade.isPending}
+              onClick={() => setDeleteOpen(true)}
+              className="w-full gap-2 border-transparent bg-destructive/15 hover:bg-destructive/25"
+            >
+              <Trash2 size={15} strokeWidth={1.5} aria-hidden />
+              Remove trade
+            </Button>
+          </DrawerFooter>
+        ) : null}
+        {trade ? (
+          <Modal
+            open={deleteOpen}
+            onOpenChange={closeDeleteModal}
+            title={`Remove ${trade.symbol}?`}
+            className="max-w-[min(336px,94vw)]"
+            footer={
+              <>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  disabled={deleteTrade.isPending}
+                  onClick={() => closeDeleteModal(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  disabled={!canDelete || deleteTrade.isPending}
+                  onClick={() => void handleDelete()}
+                  className="border-transparent bg-destructive/15 hover:bg-destructive/25"
+                >
+                  {deleteTrade.isPending ? "Removing…" : "Remove trade"}
+                </Button>
+              </>
+            }
+          >
+            <p className="m-0 text-[13px] leading-relaxed text-muted-foreground">
+              Permanently deletes this trade and all of its fills. This cannot be undone.
+            </p>
+            <div>
+              <label
+                htmlFor={confirmInputId}
+                className="mb-1.5 block text-[11px] text-muted-foreground"
+              >
+                Type <span className="font-medium text-foreground">{trade.symbol}</span> to confirm
+              </label>
+              <FormInput
+                id={confirmInputId}
+                value={typedConfirm}
+                onChange={(e) => setTypedConfirm(e.target.value)}
+                autoFocus
+                autoComplete="off"
+                spellCheck={false}
+                aria-label={`Type ${trade.symbol} to confirm`}
+              />
+            </div>
+          </Modal>
+        ) : null}
+      </DrawerContent>
+    </Drawer>
+  );
+}
+
+function BentoStat({
+  label,
+  value,
+  className,
+}: {
+  label: string;
+  value: string;
+  className?: string;
+}) {
+  return (
+    <div className={cn("flex min-w-0 flex-col gap-1 bg-sidebar p-2 sm:p-2.5", className)}>
+      <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {label}
+      </span>
+      <span
+        className="truncate text-sm tabular-nums whitespace-nowrap text-foreground"
+        title={value}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function TradeDetailSheetBody({
+  trade,
+  onOpenFullPage,
+}: {
+  trade: TradeDetail;
+  onOpenFullPage: () => void;
+}) {
+  usePrivacyMode();
+  useDisplayTimePrefs();
+  const currency = trade.pnl_currency;
+  const price = (value: number | null) =>
+    value == null
+      ? "—"
+      : value.toLocaleString(intlLocale(), {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 8,
+        });
+  const pnl = trade.net_pnl;
+  const status = tradeStatus(trade);
+  const hold = computeRiskReward(trade).holdLabel;
+  const qty =
+    trade.status === "open" && trade.qty_remaining > 0 ? trade.qty_remaining : trade.qty_opened;
+
+  return (
+    <div className="flex flex-col gap-5 px-4 py-4">
+      <div>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <Pill tone={status.tone} title={status.label === "BE" ? "Break-even" : undefined}>
+            {status.label}
+          </Pill>
+          <span className="text-xs tabular-nums text-muted-foreground">
+            {trade.status === "open"
+              ? `${fmtDateTime(trade.opened_at)} · still open`
+              : `${fmtDateTime(trade.opened_at)} → ${
+                  trade.closed_at ? fmtDateTime(trade.closed_at) : "—"
+                }${hold === "-" ? "" : ` · ${hold}`}`}
+          </span>
+        </div>
+        {/* The stat column carries three figures per row and the hero carries
+            one, so the extra share goes to the column that has to fit more.
+            Both tracks still floor at min-content, so a long P&L widens the
+            hero rather than being clipped by the ratio. */}
+        <div className="mt-3 grid grid-cols-[1fr_1.15fr] gap-px overflow-hidden rounded-md bg-border">
+          <div className="row-span-2 flex flex-col justify-between gap-3 bg-sidebar p-3.5">
+            <div>
+              {pnl != null ? (
+                <>
+                  <p className={cn("m-0 tabular-nums", heroPnlClass(pnl))}>
+                    {fmtSignedMoney(pnl, currency, intlLocale())}
+                  </p>
+                  <p className="mt-1.5 mb-0 text-sm font-semibold tabular-nums">
+                    {trade.return_pct != null && (
+                      <span className={pnlColor(trade.return_pct)}>
+                        {trade.return_pct >= 0 ? "+" : ""}
+                        {trade.return_pct.toFixed(2)}%
+                      </span>
+                    )}
+                    {trade.r_multiple != null && (
+                      <span className={cn("ml-2", pnlColor(trade.r_multiple))}>
+                        {trade.r_multiple >= 0 ? "+" : ""}
+                        {trade.r_multiple.toFixed(2)}R
+                      </span>
+                    )}
+                  </p>
+                </>
+              ) : (
+                <p className="m-0 text-[32px] font-semibold leading-none text-flat">—</p>
+              )}
+            </div>
+            {trade.gross_pnl != null && (
+              <p className="m-0 text-[10px] tabular-nums text-muted-foreground">
+                {fmtSignedMoney(trade.gross_pnl, currency, intlLocale())} gross −{""}
+                {fmtMoney(trade.fees_total, currency, intlLocale())} fees
+              </p>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-px">
+            <BentoStat
+              label="Entry"
+              value={price(trade.avg_entry_price)}
+            />
+            <BentoStat
+              label="Exit"
+              value={
+                price(trade.avg_exit_price)
+              }
+            />
+          </div>
+          {/* `auto` rather than a fixed ratio: these three hold a count, a
+              duration and a money amount, and which one needs the most room
+              changes per trade. A fixed split gave Hold 80px to render "7m"
+              while Fees truncated "$6.88" in 35px. Each track now takes what
+              its own value needs and the slack is shared; `truncate` on the
+              value stays as the last resort when all three run long. */}
+          <div className="grid grid-cols-[auto_auto_auto] gap-px">
+            <BentoStat label="Qty" value={qty.toFixed(2)} />
+            <BentoStat label="Hold" value={hold === "-" ? "—" : hold} />
+            <BentoStat label="Fees" value={fmtMoney(trade.fees_total, currency, intlLocale())} />
+          </div>
+        </div>
+        {(trade.tags.length > 0 || trade.setup) && (
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+            {trade.tags.map((t) => (
+              <Pill key={t.id} tone="muted">
+                {t.name}
+              </Pill>
+            ))}
+            {trade.setup && (
+              <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Zap size={14} strokeWidth={1.5} className="text-chart-3" />
+                Setup: <span className="font-medium text-foreground">{trade.setup.name}</span>
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+
+      <RiskRewardPanel trade={trade} className="p-0" hideWhenEmpty />
+
+      <div className="-mx-4">
+        <TradeChartSection trade={trade} />
+      </div>
+
+      <section>
+        <p className={sectionLabelClass}>Executions ({trade.fills.length})</p>
+        {trade.fills.length === 0 ? (
+          <p className="text-xs text-muted-foreground">No fills recorded.</p>
+        ) : (
+          <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
+            {trade.fills.map((f) => (
+              <li
+                key={f.id}
+                className="-mx-2 flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-xs tabular-nums transition-colors hover:bg-accent"
+              >
+                <span className="flex items-center gap-2">
+                  <span
+                    aria-label={f.side === "buy" ? "Buy" : "Sell"}
+                    className={cn(
+                      "flex size-4 items-center justify-center rounded-md text-[10px] font-bold",
+                      f.side === "buy"
+                        ? "bg-profit/10 text-profit"
+                        : "bg-destructive/10 text-destructive",
+                    )}
+                  >
+                    {f.side === "buy" ? "B" : "S"}
+                  </span>
+                  <span className="text-foreground">
+                    {f.quantity} @ {price(f.price)}
+                  </span>
+                  {f.fees + f.commission > 0 && (
+                    <span className="text-muted-foreground">
+                      {fmtMoney(f.fees + f.commission, currency, intlLocale())} fee
+                    </span>
+                  )}
+                </span>
+                <span className="text-muted-foreground">{fmtDateTime(f.executed_at)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {trade.notes.trim() !== "" && (
+        <section>
+          <p className={sectionLabelClass}>Notes</p>
+          <p className="m-0 line-clamp-3 text-sm whitespace-pre-wrap text-muted-foreground">
+            {trade.notes}
+          </p>
+          <Button
+            type="button"
+            variant="link"
+            onClick={onOpenFullPage}
+            className="mt-1.5 h-auto text-xs"
+          >
+            Read more
+          </Button>
+        </section>
+      )}
+    </div>
+  );
+}
+
