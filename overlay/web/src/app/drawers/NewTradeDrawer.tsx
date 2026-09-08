@@ -85,6 +85,10 @@ import {
   weightedAvgEntry,
 } from "@/lib/newTradeJournal";
 import {
+  calculatePositionSizing,
+  type PositionSizingMode,
+} from "@/lib/positionSizing";
+import {
   defaultNewTradeFormValues,
   emptyExecutionRow,
   emptySymbolTrade,
@@ -475,12 +479,232 @@ function blockPnlPreview(block: SymbolTradeBlock) {
   };
 }
 
+const POSITION_SIZING_MODES: Array<{ value: PositionSizingMode; label: string }> = [
+  { value: "risk_pct", label: "Risk %" },
+  { value: "units", label: "Units" },
+  { value: "risk_amount", label: "Risk amount" },
+  { value: "margin_amount", label: "Margin amount" },
+  { value: "margin_pct", label: "Margin %" },
+];
+
+function metricValue(value: number | null, format: (n: number) => string) {
+  return value == null ? "—" : format(value);
+}
+
+function PositionSizingCalculator({
+  block,
+  base,
+  form,
+  currency,
+  locale,
+  accountBalance,
+  entryPrice,
+  entryQty,
+  multiplier,
+}: {
+  block: SymbolTradeBlock;
+  base: `trades[${number}]`;
+  form: NewTradeFormApi;
+  currency: string;
+  locale: string;
+  accountBalance: number | null;
+  entryPrice: number | null;
+  entryQty: number | null;
+  multiplier: number;
+}) {
+  const [mode, setMode] = useState<PositionSizingMode>("risk_pct");
+  const [riskPercent, setRiskPercent] = useState("1");
+  const [riskAmount, setRiskAmount] = useState("");
+  const [units, setUnits] = useState("");
+  const [marginAmount, setMarginAmount] = useState("");
+  const [marginPercent, setMarginPercent] = useState("");
+  const stopPrice = num(block.stop);
+  const targetPrice = num(block.target);
+  const result = useMemo(
+    () =>
+      calculatePositionSizing({
+        mode,
+        side: block.side,
+        accountBalance,
+        entryPrice,
+        stopPrice,
+        takeProfitPrice: targetPrice,
+        units: mode === "units" ? num(units) : entryQty,
+        riskPercent: num(riskPercent),
+        riskAmount: num(riskAmount),
+        marginAmount: num(marginAmount),
+        marginPercent: num(marginPercent),
+        multiplier,
+      }),
+    [
+      accountBalance,
+      block.side,
+      entryPrice,
+      entryQty,
+      marginAmount,
+      marginPercent,
+      mode,
+      multiplier,
+      riskAmount,
+      riskPercent,
+      stopPrice,
+      targetPrice,
+      units,
+    ],
+  );
+  const openSide = block.side === "long" ? "buy" : "sell";
+  const openRowIndex = block.rows.findIndex((row) => row.side === openSide);
+
+  function applyUnits() {
+    if (result.units == null || openRowIndex < 0) return;
+    form.setFieldValue(
+      `${base}.rows[${openRowIndex}].quantity` as never,
+      String(result.units) as never,
+    );
+  }
+
+  const money = (value: number) => fmtMoney(value, currency, locale);
+  const pct = (value: number) => `${value.toFixed(value >= 10 ? 2 : 4)}%`;
+  const plain = (value: number) => value.toLocaleString(locale, { maximumFractionDigits: 6 });
+
+  return (
+    <Collapsible
+      defaultOpen
+      className="rounded-md border border-border bg-muted/25 p-3 @container/calculator"
+      render={<section aria-label="Risk and position size calculator" />}
+    >
+      <CollapsibleTrigger className="w-full items-center gap-2 text-left">
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="text-[12px] font-semibold tracking-wide">Risk / position size</span>
+          <span className="truncate text-[10px] font-normal text-muted-foreground">
+            {metricValue(result.monetaryRisk, money)} risk ·{" "}
+            {result.riskReward == null ? "—" : `${result.riskReward.toFixed(2)}R`} reward
+          </span>
+        </span>
+        <CollapsibleChevron />
+      </CollapsibleTrigger>
+      <CollapsibleContent animation="fade">
+        <div className="mt-3 flex flex-col gap-3">
+          <Field label="Calculation mode">
+            <NativeSelect
+              aria-label="Position sizing calculation mode"
+              value={mode}
+              onChange={(event) => setMode(event.target.value as PositionSizingMode)}
+              className={fieldTextClass}
+              wrapperClassName="w-full"
+            >
+              {POSITION_SIZING_MODES.map((option) => (
+                <NativeSelectOption key={option.value} value={option.value}>
+                  {option.label}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+          </Field>
+          <div className="grid grid-cols-2 gap-3 @min-[38rem]/calculator:grid-cols-5">
+            <Field label="Risk %">
+              <AmountInput
+                aria-label="Risk percent"
+                value={riskPercent}
+                onValueChange={setRiskPercent}
+                placeholder="1"
+                compact
+              />
+            </Field>
+            <Field label={`Risk ${currency}`}>
+              <AmountInput
+                aria-label="Risk amount"
+                value={riskAmount}
+                onValueChange={setRiskAmount}
+                placeholder="Amount"
+                compact
+              />
+            </Field>
+            <Field label="Units">
+              <AmountInput
+                aria-label="Calculator units"
+                value={units}
+                onValueChange={setUnits}
+                placeholder={entryQty != null ? String(entryQty) : "Units"}
+                compact
+              />
+            </Field>
+            <Field label={`Margin ${currency}`}>
+              <AmountInput
+                aria-label="Margin amount"
+                value={marginAmount}
+                onValueChange={setMarginAmount}
+                placeholder="Amount"
+                compact
+              />
+            </Field>
+            <Field label="Margin %">
+              <AmountInput
+                aria-label="Margin percent"
+                value={marginPercent}
+                onValueChange={setMarginPercent}
+                placeholder="Percent"
+                compact
+              />
+            </Field>
+          </div>
+          <div className="grid grid-cols-2 gap-2 @min-[38rem]/calculator:grid-cols-4">
+            <CalcMetric label="Balance" value={metricValue(result.accountBalance, money)} />
+            <CalcMetric label="Entry" value={metricValue(result.entryPrice, plain)} />
+            <CalcMetric label="Stop" value={metricValue(result.stopPrice, plain)} />
+            <CalcMetric label="Take profit" value={metricValue(result.takeProfitPrice, plain)} />
+            <CalcMetric label="Units" value={metricValue(result.units, plain)} />
+            <CalcMetric label="Risk" value={metricValue(result.monetaryRisk, money)} />
+            <CalcMetric label="Risk %" value={metricValue(result.riskPercent, pct)} />
+            <CalcMetric label="Potential profit" value={metricValue(result.potentialProfit, money)} />
+            <CalcMetric
+              label="Risk-to-reward"
+              value={result.riskReward == null ? "—" : `1:${result.riskReward.toFixed(2)}`}
+            />
+            <CalcMetric label="Margin" value={metricValue(result.marginAmount, money)} />
+            <CalcMetric label="Margin %" value={metricValue(result.marginPercent, pct)} />
+            <CalcMetric label="Notional" value={metricValue(result.notional, money)} />
+          </div>
+          {result.issues.length > 0 ? (
+            <div className="rounded-md border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-[11px] leading-relaxed text-amber-200">
+              {result.issues.join(" ")}
+            </div>
+          ) : null}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={result.units == null || openRowIndex < 0}
+            onClick={applyUnits}
+            className="self-start text-sm"
+          >
+            Apply units
+          </Button>
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+function CalcMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-md border border-border bg-background/40 px-2.5 py-2">
+      <div className="truncate text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
+        {label}
+      </div>
+      <div className="mt-1 truncate text-[12px] font-semibold tabular-nums text-foreground">
+        {value}
+      </div>
+    </div>
+  );
+}
+
 function SymbolCard({
   form,
   block,
   index,
   currency,
   locale,
+  accountBalance,
   removable,
   pending,
   setups,
@@ -497,6 +721,7 @@ function SymbolCard({
   index: number;
   currency: string;
   locale: string;
+  accountBalance: number | null;
   removable: boolean;
   pending: boolean;
   setups: Array<{ id: string; name: string }>;
@@ -1042,6 +1267,17 @@ function SymbolCard({
             currency={currency}
             locale={locale}
             initialRisk={risk}
+          />
+          <PositionSizingCalculator
+            block={block}
+            base={base}
+            form={form}
+            currency={currency}
+            locale={locale}
+            accountBalance={accountBalance}
+            entryPrice={entry?.avg ?? null}
+            entryQty={entry?.qty ?? null}
+            multiplier={multiplier}
           />
 
           <SymbolExtrasAccordion
@@ -1983,6 +2219,7 @@ export function NewTradeDrawer() {
                         index={index}
                         currency={currency}
                         locale={locale}
+                        accountBalance={accountBaseline.cash}
                         removable={!isEditMode && values.trades.length > 1}
                         pending={pending}
                         setups={setups}
