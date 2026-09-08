@@ -8,6 +8,8 @@ export interface MarketSessionDef {
 
 export interface MarketSessionState extends MarketSessionDef {
   localTime: string;
+  userLocalRange: string;
+  statusLabel: "Open" | "Closed";
   open: boolean;
   progress: number;
   nextTransitionAt: Date;
@@ -117,10 +119,26 @@ export function formatDurationUntil(to: Date, from: Date): string {
   return `${hours}h ${minutes}m`;
 }
 
+function formatSessionTime(at: Date, locale: string, timeZone: string): string {
+  return new Intl.DateTimeFormat(locale, {
+    timeZone,
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(at);
+}
+
+function formatSessionRange(openAt: Date, closeAt: Date, locale: string, timeZone: string): string {
+  return [
+    formatSessionTime(openAt, locale, timeZone),
+    formatSessionTime(closeAt, locale, timeZone),
+  ].join(" - ");
+}
+
 export function sessionState(
   def: MarketSessionDef,
   now: Date,
   locale = "en-US",
+  userTimeZone = def.timeZone,
 ): MarketSessionState {
   const today = zonedParts(now, def.timeZone);
   const openToday = zonedInstant(def.timeZone, today, def.openLocalHour);
@@ -140,6 +158,8 @@ export function sessionState(
       minute: "2-digit",
       hourCycle: "h23",
     }).format(now),
+    userLocalRange: formatSessionRange(openToday, closeToday, locale, userTimeZone),
+    statusLabel: open ? "Open" : "Closed",
     open,
     progress: Math.min(Math.max(progress, 0), 1),
     nextTransitionAt,
@@ -147,21 +167,38 @@ export function sessionState(
   };
 }
 
-export function marketSessionSnapshot(now: Date = new Date(), locale = "en-US") {
-  const sessions = MARKET_SESSIONS.map((def) => sessionState(def, now, locale));
+export function marketSessionSnapshot(
+  now: Date = new Date(),
+  locale = "en-US",
+  userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+) {
+  const sessions = MARKET_SESSIONS.map((def) => sessionState(def, now, locale, userTimeZone));
   const openSessions = sessions.filter((s) => s.open);
   const nextTransition = [...sessions].sort(
     (a, b) => a.nextTransitionAt.getTime() - b.nextTransitionAt.getTime(),
   )[0];
+  const overlapLabel =
+    openSessions.length > 1 ? `Active overlap: ${openSessions.map((s) => s.label).join(" + ")}` : "";
 
   return {
     sessions,
     openSessions,
     anyOpen: openSessions.length > 0,
+    overlapLabel,
     label:
       openSessions.length > 0
         ? `${openSessions.map((s) => s.label).join(" / ")} open`
         : "Markets closed",
     nextTransition,
   };
+}
+
+export function tradingSessionNameAt(at: Date): "Sydney" | "Asia" | "London" | "New York" | "" {
+  if (Number.isNaN(at.getTime())) return "";
+  const open = MARKET_SESSIONS.filter((def) => sessionState(def, at).open);
+  if (open.some((s) => s.id === "new-york")) return "New York";
+  if (open.some((s) => s.id === "london")) return "London";
+  if (open.some((s) => s.id === "tokyo")) return "Asia";
+  if (open.some((s) => s.id === "sydney")) return "Sydney";
+  return "";
 }

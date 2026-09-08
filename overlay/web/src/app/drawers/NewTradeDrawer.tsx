@@ -81,6 +81,7 @@ import {
 } from "@/lib/futuresPresets";
 import { capScreenshots, useJournalPrefs } from "@/lib/journalPrefs";
 import { MARKET_LABELS, marketDefaultsForSymbol } from "@/lib/marketInference";
+import { tradingSessionNameAt } from "@/lib/marketSessions";
 import {
   buildStructuredJournalNotes,
   computeInitialRisk,
@@ -1146,7 +1147,14 @@ function SymbolCard({
                             <DateTimePicker
                               aria-label={`Date/time symbol ${index + 1} row ${rowIndex + 1}`}
                               value={field.state.value as string}
-                              onChange={(v) => field.handleChange(v as never)}
+                              onChange={(v) => {
+                                field.handleChange(v as never);
+                                if (block.session) return;
+                                const detected = tradingSessionNameAt(new Date(v));
+                                if (detected) {
+                                  form.setFieldValue(`${base}.session` as never, detected as never);
+                                }
+                              }}
                               compact
                             />
                           )}

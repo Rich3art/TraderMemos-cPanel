@@ -1,6 +1,7 @@
 import { ChevronUp, Clock3, Radio } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/cn";
+import { resolveDisplayTimezone, useDisplayTimePrefs } from "@/lib/displayPrefs";
 import { intlLocale } from "@/lib/locale";
 import { marketSessionSnapshot } from "@/lib/marketSessions";
 import { Menu, MenuPopup, MenuTrigger } from "./ui/menu";
@@ -26,7 +27,12 @@ function useMinuteClock() {
 export function MarketSessionClock() {
   const now = useMinuteClock();
   const locale = intlLocale();
-  const snapshot = useMemo(() => marketSessionSnapshot(now, locale), [now, locale]);
+  const { timezone } = useDisplayTimePrefs();
+  const userTimeZone = resolveDisplayTimezone(timezone);
+  const snapshot = useMemo(
+    () => marketSessionSnapshot(now, locale, userTimeZone),
+    [now, locale, userTimeZone],
+  );
   const next = snapshot.nextTransition?.nextTransitionLabel ?? "";
 
   return (
@@ -79,6 +85,9 @@ export function MarketSessionClock() {
             <div className="min-w-0">
               <p className="m-0 text-[15px] font-semibold text-foreground">{snapshot.label}</p>
               <p className="mt-0.5 text-[12px] text-muted-foreground">{next}</p>
+              {snapshot.overlapLabel ? (
+                <p className="mt-1 text-[12px] text-profit">{snapshot.overlapLabel}</p>
+              ) : null}
             </div>
           </div>
 
@@ -94,7 +103,7 @@ export function MarketSessionClock() {
               {snapshot.sessions.map((session) => (
                 <div
                   key={session.id}
-                  className="grid grid-cols-[4.75rem_minmax(0,1fr)_3.25rem] items-center gap-3"
+                  className="grid grid-cols-[4.75rem_minmax(0,1fr)_4.75rem] items-center gap-3"
                 >
                   <span className="truncate text-[12px] text-muted-foreground">
                     {session.label}
@@ -110,6 +119,19 @@ export function MarketSessionClock() {
                   </span>
                   <span className="text-right text-[12px] tabular-nums text-muted-foreground">
                     {session.localTime}
+                  </span>
+                  <span className="col-span-3 -mt-1 grid grid-cols-[4.75rem_minmax(0,1fr)] gap-3 text-[11px] text-muted-foreground">
+                    <span
+                      className={cn(
+                        "font-medium",
+                        session.open ? "text-profit" : "text-muted-foreground",
+                      )}
+                    >
+                      {session.statusLabel}
+                    </span>
+                    <span className="min-w-0 truncate">
+                      {session.userLocalRange} local time · {session.nextTransitionLabel}
+                    </span>
                   </span>
                 </div>
               ))}

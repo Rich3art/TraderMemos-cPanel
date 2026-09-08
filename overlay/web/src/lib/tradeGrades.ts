@@ -65,5 +65,5 @@ export function joinEmotionalStates(states: readonly string[]): string {
 }
 
 /** Session labels for journal chips (stored in notes until a real session column exists). */
-export const TRADE_SESSIONS = ["Sydney", "Asia", "London", "New York AM", "New York PM"] as const;
+export const TRADE_SESSIONS = ["Sydney", "Asia", "London", "New York", "New York AM", "New York PM"] as const;
 export type TradeSession = (typeof TRADE_SESSIONS)[number];
