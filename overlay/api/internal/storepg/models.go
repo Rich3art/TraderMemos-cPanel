@@ -255,6 +255,16 @@ type PropSetting struct {
 	UpdatedAt      time.Time       `json:"updated_at"`
 }
 
+type ChartAnnotation struct {
+	UserID     string    `json:"user_id"`
+	EntityType string    `json:"entity_type"`
+	EntityID   string    `json:"entity_id"`
+	Symbol     string    `json:"symbol"`
+	Interval   string    `json:"interval"`
+	Drawings   string    `json:"drawings"`
+	UpdatedAt  time.Time `json:"updated_at"`
+}
+
 type RiskRule struct {
 	UserID                string          `json:"user_id"`
 	MaxRiskPerTrade       sql.NullFloat64 `json:"max_risk_per_trade"`

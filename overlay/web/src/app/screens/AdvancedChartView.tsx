@@ -98,6 +98,7 @@ export function AdvancedChartView({
               height={480}
               hideHeaderLabel
               drawingTools
+              annotationScope={{ entityType: "analysis", entityId: symbol }}
             />
           </section>
         ) : (

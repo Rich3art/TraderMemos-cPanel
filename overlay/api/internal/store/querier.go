@@ -29,6 +29,7 @@ type Querier interface {
 	DeleteAnnualGoal(ctx context.Context, arg DeleteAnnualGoalParams) (int64, error)
 	DeleteAttachment(ctx context.Context, arg DeleteAttachmentParams) (int64, error)
 	DeleteCashTransaction(ctx context.Context, arg DeleteCashTransactionParams) (int64, error)
+	DeleteChartAnnotationsForEntity(ctx context.Context, arg DeleteChartAnnotationsForEntityParams) error
 	DeleteCoachReview(ctx context.Context, arg DeleteCoachReviewParams) (int64, error)
 	DeleteExecution(ctx context.Context, arg DeleteExecutionParams) (int64, error)
 	DeleteExecutionsForAccount(ctx context.Context, arg DeleteExecutionsForAccountParams) error
@@ -56,6 +57,7 @@ type Querier interface {
 	GetAnnualGoal(ctx context.Context, arg GetAnnualGoalParams) (AnnualGoal, error)
 	GetAttachment(ctx context.Context, arg GetAttachmentParams) (TradeAttachment, error)
 	GetCashTransactionByImportBatch(ctx context.Context, arg GetCashTransactionByImportBatchParams) (CashTransaction, error)
+	GetChartAnnotation(ctx context.Context, arg GetChartAnnotationParams) (ChartAnnotation, error)
 	GetChecklistTemplate(ctx context.Context, userID string) (ChecklistTemplate, error)
 	GetCoachSettings(ctx context.Context) (CoachSetting, error)
 	GetEconomicEventsLastFetch(ctx context.Context, provider string) (string, error)
@@ -159,6 +161,7 @@ type Querier interface {
 	UpsertAlertChannel(ctx context.Context, arg UpsertAlertChannelParams) (AlertChannel, error)
 	UpsertAlertSettings(ctx context.Context, arg UpsertAlertSettingsParams) (AlertSetting, error)
 	UpsertAnnualGoal(ctx context.Context, arg UpsertAnnualGoalParams) (AnnualGoal, error)
+	UpsertChartAnnotation(ctx context.Context, arg UpsertChartAnnotationParams) (ChartAnnotation, error)
 	UpsertChecklistTemplate(ctx context.Context, arg UpsertChecklistTemplateParams) (ChecklistTemplate, error)
 	UpsertCoachSettings(ctx context.Context, arg UpsertCoachSettingsParams) (CoachSetting, error)
 	UpsertEconomicEvent(ctx context.Context, arg UpsertEconomicEventParams) error

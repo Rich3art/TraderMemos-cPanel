@@ -19,6 +19,8 @@ func (s *Server) setupRoutes(g *echo.Group) {
 	g.GET("/setups/:id", s.handleGetSetup)
 	g.PATCH("/setups/:id", s.handleUpdateSetup)
 	g.DELETE("/setups/:id", s.handleDeleteSetup)
+	g.GET("/chart-annotations/:entity_type/:entity_id", s.handleGetChartAnnotation)
+	g.PUT("/chart-annotations/:entity_type/:entity_id", s.handlePutChartAnnotation)
 	g.POST("/setups/:id/attachments", s.handleUploadSetupAttachment)
 	g.GET("/setups/:id/attachments", s.handleListSetupAttachments)
 	g.GET("/setup-attachments/:id/file", s.handleGetSetupAttachmentFile)
@@ -26,17 +28,17 @@ func (s *Server) setupRoutes(g *echo.Group) {
 }
 
 type setupDTO struct {
-	ID          string    `json:"id"`
-	UserID      string    `json:"user_id"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	CreatedAt   time.Time `json:"created_at"`
-	Thesis      string    `json:"thesis"`
-	Symbol      string    `json:"symbol"`
-	Direction   string    `json:"direction"`
-	TargetPrice *float64  `json:"target_price"`
-	StopPrice   *float64  `json:"stop_price"`
-	Checklist   []string  `json:"checklist"`
+	ID          string               `json:"id"`
+	UserID      string               `json:"user_id"`
+	Name        string               `json:"name"`
+	Description string               `json:"description"`
+	CreatedAt   time.Time            `json:"created_at"`
+	Thesis      string               `json:"thesis"`
+	Symbol      string               `json:"symbol"`
+	Direction   string               `json:"direction"`
+	TargetPrice *float64             `json:"target_price"`
+	StopPrice   *float64             `json:"stop_price"`
+	Checklist   []string             `json:"checklist"`
 	Attachments []setupAttachmentDTO `json:"attachments,omitempty"`
 }
 
@@ -241,6 +243,12 @@ func (s *Server) handleDeleteSetup(c *echo.Context) error {
 	if n == 0 {
 		return Fail(http.StatusNotFound, "not_found", "setup not found", nil)
 	}
+	_ = s.deps.Store.DeleteChartAnnotationsForEntity(ctx, store.DeleteChartAnnotationsForEntityParams{
+		UserID: uid, EntityType: "setup", EntityID: c.Param("id"),
+	})
+	_ = s.deps.Store.DeleteChartAnnotationsForEntity(ctx, store.DeleteChartAnnotationsForEntityParams{
+		UserID: uid, EntityType: "playbook", EntityID: c.Param("id"),
+	})
 	for _, att := range rows {
 		_ = s.deps.Storage.Delete(att.StorageKey)
 	}

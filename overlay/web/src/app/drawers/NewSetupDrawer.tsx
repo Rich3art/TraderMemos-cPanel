@@ -23,6 +23,7 @@ import {
 import { useToastManager } from "@/components/Toast";
 import { Button } from "@/components/ui/button";
 import { parseAmountToNumber } from "@/lib/amountInput";
+import { chartAnnotationsApi } from "@/lib/api/chartAnnotations";
 import { setupsApi } from "@/lib/api/setups";
 import type { BarInterval } from "@/lib/api/market";
 import { capScreenshots, useJournalPrefs } from "@/lib/journalPrefs";
@@ -60,6 +61,8 @@ const SETUP_CHART_LOOKBACK_MS = 180 * 86_400_000;
 const SetupTradeChart = lazy(() =>
   import("@/components/charts/TradeChart").then((m) => ({ default: m.TradeChart })),
 );
+const readStoredChartDrawings = () =>
+  import("@/components/charts/TradeChart").then((m) => m.readStoredChartDrawings);
 
 function valuesFromDraft(draft: NonNullable<ReturnType<typeof useUI.getState>["setupDraft"]>) {
   return {
@@ -83,10 +86,12 @@ function SetupSymbolChart({
   symbol,
   target,
   stop,
+  setupId,
 }: {
   symbol: string;
   target: string;
   stop: string;
+  setupId?: string | null;
 }) {
   const cleanSymbol = symbol.trim().toUpperCase();
   const range = useMemo(() => setupChartWindow(), [cleanSymbol]);
@@ -117,6 +122,7 @@ function SetupSymbolChart({
           height={260}
           hideHeaderLabel
           drawingTools
+          annotationScope={setupId ? { entityType: "setup", entityId: setupId } : null}
         />
       </Suspense>
     </div>
@@ -168,6 +174,16 @@ export function NewSetupDrawer() {
           toast.add({ title: "Setup created", description: body.name });
         }
         if (savedId) {
+          const readDrawings = await readStoredChartDrawings();
+          const drawings = readDrawings(body.symbol ?? "", SETUP_CHART_INTERVAL);
+          if (drawings.length > 0) {
+            await chartAnnotationsApi.save(
+              { entityType: "setup", entityId: savedId },
+              body.symbol ?? "",
+              SETUP_CHART_INTERVAL,
+              drawings,
+            );
+          }
           for (const file of capScreenshots(pendingFiles, maxScreenshots)) {
             const fd = new FormData();
             fd.append("file", file);
@@ -370,7 +386,7 @@ export function NewSetupDrawer() {
 
             <form.Subscribe selector={(s) => [s.values.symbol, s.values.target, s.values.stop]}>
               {([symbol, target, stop]) => (
-                <SetupSymbolChart symbol={symbol} target={target} stop={stop} />
+                <SetupSymbolChart symbol={symbol} target={target} stop={stop} setupId={editingId} />
               )}
             </form.Subscribe>
 

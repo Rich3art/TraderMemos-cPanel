@@ -15,14 +15,24 @@ import {
   MoveHorizontal,
   MoveVertical,
   Play,
+  Save,
   Slash,
   Square,
   Trash2,
   Undo2,
   X,
 } from "lucide-react";
-import { useEffect, useId, useMemo, useRef, useState, type PointerEvent } from "react";
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent,
+  type SetStateAction,
+} from "react";
 import type { Execution } from "@/lib/api/types";
+import { chartAnnotationsApi, type ChartAnnotationScope } from "@/lib/api/chartAnnotations";
 import type { MarketBar, BarInterval } from "@/lib/api/market";
 import { cn } from "@/lib/cn";
 import { SegmentedControl } from "@/components/SegmentedControl";
@@ -37,7 +47,7 @@ export type ChartFill = Pick<Execution, "side" | "quantity" | "price" | "execute
 
 type DrawingTool = "select" | "trendline" | "horizontal" | "vertical" | "rectangle";
 
-type ChartDrawing =
+export type ChartDrawing =
   | { id: string; type: "trendline"; from: DrawingPoint; to: DrawingPoint }
   | { id: string; type: "horizontal"; price: number }
   | { id: string; type: "vertical"; time: number }
@@ -53,8 +63,17 @@ const DRAWING_COLOR = "#38bdf8";
 const DRAWING_FILL = "rgba(56, 189, 248, 0.12)";
 const DRAWING_STORAGE_PREFIX = "tradermemos-chart-drawings:";
 
-function drawingStorageKey(symbol: string, interval: BarInterval) {
+export function drawingStorageKey(symbol: string, interval: BarInterval) {
   return `${DRAWING_STORAGE_PREFIX}${symbol.trim().toUpperCase()}:${interval}`;
+}
+
+export function readStoredChartDrawings(symbol: string, interval: BarInterval): ChartDrawing[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(drawingStorageKey(symbol, interval)) ?? "[]") as unknown;
+    return Array.isArray(parsed) ? parsed.filter(isChartDrawing) : [];
+  } catch {
+    return [];
+  }
 }
 
 function isDrawingTool(value: string): value is DrawingTool {
@@ -132,6 +151,8 @@ export interface TradeChartProps {
   replayActive?: boolean;
   /** Enables local chart drawing tools. Drawings are saved per symbol and interval in this browser. */
   drawingTools?: boolean;
+  /** Persists drawings against the authenticated setup/trade/playbook/chart context. */
+  annotationScope?: ChartAnnotationScope | null;
 }
 
 export function TradeChart({
@@ -156,6 +177,7 @@ export function TradeChart({
   onToggleReplay,
   replayActive = false,
   drawingTools = false,
+  annotationScope = null,
 }: TradeChartProps) {
   const symbol = _symbol.trim().toUpperCase();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -170,6 +192,10 @@ export function TradeChart({
   const [activeTool, setActiveTool] = useState<DrawingTool>("select");
   const [drawings, setDrawings] = useState<ChartDrawing[]>([]);
   const [draft, setDraft] = useState<DraftDrawing | null>(null);
+  const [drawingsDirty, setDrawingsDirty] = useState(false);
+  const [annotationsLoading, setAnnotationsLoading] = useState(false);
+  const [annotationsSaving, setAnnotationsSaving] = useState(false);
+  const [annotationsError, setAnnotationsError] = useState("");
 
   const showInterval = Boolean(onIntervalChange) && !(hideIntervalWhenEmpty && empty);
   const overlayMessage = loading
@@ -183,17 +209,46 @@ export function TradeChart({
           : null;
   const canDraw = drawingTools && ready && !loading && !overlayMessage;
   const drawingKey = useMemo(() => drawingStorageKey(symbol, interval), [symbol, interval]);
+  const annotationEntityKey =
+    annotationScope && annotationScope.entityId
+      ? `${annotationScope.entityType}:${annotationScope.entityId}`
+      : "";
 
   useEffect(() => {
     if (!drawingTools) return;
-    try {
-      const parsed = JSON.parse(localStorage.getItem(drawingKey) ?? "[]") as unknown;
-      setDrawings(Array.isArray(parsed) ? parsed.filter(isChartDrawing) : []);
-    } catch {
-      setDrawings([]);
+    let cancelled = false;
+    async function loadDrawings() {
+      setDraft(null);
+      setAnnotationsError("");
+      if (!annotationScope?.entityId) {
+        setDrawings(readStoredChartDrawings(symbol, interval));
+        setDrawingsDirty(false);
+        return;
+      }
+      setAnnotationsLoading(true);
+      try {
+        const record = await chartAnnotationsApi.get<ChartDrawing>(annotationScope, symbol, interval);
+        if (cancelled) return;
+        const serverDrawings = Array.isArray(record.drawings)
+          ? record.drawings.filter(isChartDrawing)
+          : [];
+        const fallbackDrawings = readStoredChartDrawings(symbol, interval);
+        setDrawings(serverDrawings.length > 0 ? serverDrawings : fallbackDrawings);
+        setDrawingsDirty(serverDrawings.length === 0 && fallbackDrawings.length > 0);
+      } catch {
+        if (cancelled) return;
+        setDrawings(readStoredChartDrawings(symbol, interval));
+        setDrawingsDirty(false);
+        setAnnotationsError("Could not load saved annotations.");
+      } finally {
+        if (!cancelled) setAnnotationsLoading(false);
+      }
     }
-    setDraft(null);
-  }, [drawingKey, drawingTools]);
+    void loadDrawings();
+    return () => {
+      cancelled = true;
+    };
+  }, [annotationEntityKey, drawingKey, drawingTools, interval, symbol]);
 
   useEffect(() => {
     if (!drawingTools) return;
@@ -203,6 +258,15 @@ export function TradeChart({
       // Local drawing persistence is best-effort.
     }
   }, [drawingKey, drawingTools, drawings]);
+
+  function setChartDrawings(next: SetStateAction<ChartDrawing[]>) {
+    setDrawings((prev) => {
+      const resolved = typeof next === "function" ? (next as (current: ChartDrawing[]) => ChartDrawing[])(prev) : next;
+      setDrawingsDirty(true);
+      setAnnotationsError("");
+      return resolved;
+    });
+  }
 
   function eventToPoint(e: PointerEvent<HTMLDivElement>): DrawingPoint | null {
     const el = containerRef.current;
@@ -241,14 +305,14 @@ export function TradeChart({
     if (!point) return;
     e.currentTarget.setPointerCapture(e.pointerId);
     if (activeTool === "horizontal") {
-      setDrawings((prev) => [
+      setChartDrawings((prev) => [
         ...prev,
         { id: makeDrawingId(), type: "horizontal", price: point.price },
       ]);
       return;
     }
     if (activeTool === "vertical") {
-      setDrawings((prev) => [...prev, { id: makeDrawingId(), type: "vertical", time: point.time }]);
+      setChartDrawings((prev) => [...prev, { id: makeDrawingId(), type: "vertical", time: point.time }]);
       return;
     }
     setDraft({ type: activeTool, from: point, to: point });
@@ -270,18 +334,39 @@ export function TradeChart({
       return;
     }
     const done = { ...draft, id: makeDrawingId(), to: point } as ChartDrawing;
-    setDrawings((prev) => [...prev, done]);
+    setChartDrawings((prev) => [...prev, done]);
     setDraft(null);
   }
 
   function undoDrawing() {
-    setDrawings((prev) => prev.slice(0, -1));
+    setChartDrawings((prev) => prev.slice(0, -1));
     setDraft(null);
   }
 
   function clearDrawings() {
-    setDrawings([]);
+    setChartDrawings([]);
     setDraft(null);
+  }
+
+  async function saveAnnotations() {
+    if (!drawingTools || !annotationScope?.entityId) {
+      setDrawingsDirty(false);
+      return;
+    }
+    setAnnotationsSaving(true);
+    setAnnotationsError("");
+    try {
+      const record = await chartAnnotationsApi.save<ChartDrawing>(annotationScope, symbol, interval, drawings);
+      const savedDrawings = Array.isArray(record.drawings)
+        ? record.drawings.filter(isChartDrawing)
+        : drawings;
+      setDrawings(savedDrawings);
+      setDrawingsDirty(false);
+    } catch {
+      setAnnotationsError("Could not save annotations.");
+    } finally {
+      setAnnotationsSaving(false);
+    }
   }
 
   function renderDrawing(drawing: ChartDrawing | DraftDrawing, key: string) {
@@ -501,58 +586,77 @@ export function TradeChart({
             />
           )}
           {drawingTools && (
-            <div
-              className="flex items-center gap-1 rounded-md bg-muted/70 p-1"
-              role="group"
-              aria-labelledby={drawingButtonGroupId}
-            >
-              <span id={drawingButtonGroupId} className="sr-only">
-                Chart drawing tools
-              </span>
-              {(
-                [
-                  ["select", MousePointer2, "Select or pan chart"],
-                  ["trendline", Slash, "Draw trendline"],
-                  ["horizontal", MoveHorizontal, "Draw horizontal level"],
-                  ["vertical", MoveVertical, "Draw vertical marker"],
-                  ["rectangle", Square, "Draw rectangle"],
-                ] as const
-              ).map(([tool, Icon, label]) => {
-                return (
-                  <Button
-                    key={tool}
-                    type="button"
-                    variant={activeTool === tool ? "secondary" : "ghost"}
-                    size="icon"
-                    aria-label={label}
-                    title={label}
-                    onClick={() => isDrawingTool(tool) && setActiveTool(tool)}
-                  >
-                    <Icon size={14} strokeWidth={1.5} aria-hidden />
-                  </Button>
-                );
-              })}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <div
+                className="flex items-center gap-1 rounded-md bg-muted/70 p-1"
+                role="group"
+                aria-labelledby={drawingButtonGroupId}
+              >
+                <span id={drawingButtonGroupId} className="sr-only">
+                  Chart drawing tools
+                </span>
+                {(
+                  [
+                    ["select", MousePointer2, "Select or pan chart"],
+                    ["trendline", Slash, "Draw trendline"],
+                    ["horizontal", MoveHorizontal, "Draw horizontal level"],
+                    ["vertical", MoveVertical, "Draw vertical marker"],
+                    ["rectangle", Square, "Draw rectangle"],
+                  ] as const
+                ).map(([tool, Icon, label]) => {
+                  return (
+                    <Button
+                      key={tool}
+                      type="button"
+                      variant={activeTool === tool ? "secondary" : "ghost"}
+                      size="icon"
+                      aria-label={label}
+                      title={label}
+                      onClick={() => isDrawingTool(tool) && setActiveTool(tool)}
+                    >
+                      <Icon size={14} strokeWidth={1.5} aria-hidden />
+                    </Button>
+                  );
+                })}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Undo last drawing"
+                  title="Undo last drawing"
+                  disabled={drawings.length === 0 || annotationsLoading}
+                  onClick={undoDrawing}
+                >
+                  <Undo2 size={14} strokeWidth={1.5} aria-hidden />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Clear drawings"
+                  title="Clear drawings"
+                  disabled={drawings.length === 0 || annotationsLoading}
+                  onClick={clearDrawings}
+                >
+                  <Trash2 size={14} strokeWidth={1.5} aria-hidden />
+                </Button>
+              </div>
               <Button
                 type="button"
-                variant="ghost"
-                size="icon"
-                aria-label="Undo last drawing"
-                title="Undo last drawing"
-                disabled={drawings.length === 0}
-                onClick={undoDrawing}
+                variant={drawingsDirty ? "soft" : "ghost"}
+                size="sm"
+                aria-label="Save annotations"
+                title={annotationScope?.entityId ? "Save annotations" : "Annotations save with setup"}
+                disabled={
+                  annotationsLoading ||
+                  annotationsSaving ||
+                  (!drawingsDirty && Boolean(annotationScope?.entityId))
+                }
+                onClick={() => void saveAnnotations()}
+                className="h-8 gap-1.5"
               >
-                <Undo2 size={14} strokeWidth={1.5} aria-hidden />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                aria-label="Clear drawings"
-                title="Clear drawings"
-                disabled={drawings.length === 0}
-                onClick={clearDrawings}
-              >
-                <Trash2 size={14} strokeWidth={1.5} aria-hidden />
+                <Save size={14} strokeWidth={1.5} aria-hidden />
+                {annotationsSaving ? "Saving..." : annotationScope?.entityId ? "Save annotations" : "Saved locally"}
               </Button>
             </div>
           )}
@@ -605,6 +709,15 @@ export function TradeChart({
           </div>
         )}
         <div ref={containerRef} className="h-full w-full" />
+        {drawingTools && (
+          <>
+            {annotationsError ? (
+              <div className="absolute right-2 bottom-2 z-30 rounded-md bg-destructive/10 px-2 py-1 text-[11px] text-destructive">
+                {annotationsError}
+              </div>
+            ) : null}
+          </>
+        )}
         {drawingTools && (
           <div
             className={cn(

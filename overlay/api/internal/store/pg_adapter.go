@@ -144,6 +144,10 @@ func (p *PG) DeleteCashTransaction(ctx context.Context, arg DeleteCashTransactio
 	return p.q.DeleteCashTransaction(ctx, storepg.DeleteCashTransactionParams(arg))
 }
 
+func (p *PG) DeleteChartAnnotationsForEntity(ctx context.Context, arg DeleteChartAnnotationsForEntityParams) error {
+	return p.q.DeleteChartAnnotationsForEntity(ctx, storepg.DeleteChartAnnotationsForEntityParams(arg))
+}
+
 func (p *PG) DeleteCoachReview(ctx context.Context, arg DeleteCoachReviewParams) (int64, error) {
 	return p.q.DeleteCoachReview(ctx, storepg.DeleteCoachReviewParams(arg))
 }
@@ -282,6 +286,14 @@ func (p *PG) GetCashTransactionByImportBatch(ctx context.Context, arg GetCashTra
 		return CashTransaction{}, err
 	}
 	return CashTransaction(v), nil
+}
+
+func (p *PG) GetChartAnnotation(ctx context.Context, arg GetChartAnnotationParams) (ChartAnnotation, error) {
+	v, err := p.q.GetChartAnnotation(ctx, storepg.GetChartAnnotationParams(arg))
+	if err != nil {
+		return ChartAnnotation{}, err
+	}
+	return ChartAnnotation(v), nil
 }
 
 func (p *PG) GetChecklistTemplate(ctx context.Context, userID string) (ChecklistTemplate, error) {
@@ -1253,6 +1265,14 @@ func (p *PG) UpsertAnnualGoal(ctx context.Context, arg UpsertAnnualGoalParams) (
 		return AnnualGoal{}, err
 	}
 	return AnnualGoal(v), nil
+}
+
+func (p *PG) UpsertChartAnnotation(ctx context.Context, arg UpsertChartAnnotationParams) (ChartAnnotation, error) {
+	v, err := p.q.UpsertChartAnnotation(ctx, storepg.UpsertChartAnnotationParams(arg))
+	if err != nil {
+		return ChartAnnotation{}, err
+	}
+	return ChartAnnotation(v), nil
 }
 
 func (p *PG) UpsertChecklistTemplate(ctx context.Context, arg UpsertChecklistTemplateParams) (ChecklistTemplate, error) {

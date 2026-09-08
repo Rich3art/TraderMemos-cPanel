@@ -99,6 +99,7 @@ export function TradeChartSection({ trade }: { trade: TradeDetail }) {
     replayActive: replay.active,
     onToggleReplay: canReplay ? () => (replay.active ? replay.exit() : replay.start()) : undefined,
     drawingTools: true,
+    annotationScope: { entityType: "trade" as const, entityId: trade.id },
   };
 
   const replayControls = replay.active && cursorBar && bars && (
