@@ -56,6 +56,36 @@ func TestParseBLSRSS(t *testing.T) {
 	require.Equal(t, "2026-09-04T12:30:00Z", events[1].Time.Format("2006-01-02T15:04:05Z"))
 }
 
+func TestParseBLSSchedule(t *testing.T) {
+	body := []byte(`
+		<table class="release-list">
+			<tbody>
+				<tr>
+					<td class="date-cell"><p>Friday, September 11, 2026</p></td>
+					<td class="time-cell"><p>08:30 AM</p></td>
+					<td class="desc-cell"><p><strong>Consumer Price Index</strong> for August 2026</p></td>
+				</tr>
+				<tr>
+					<td class="date-cell"><p>Monday, September 7, 2026</p></td>
+					<td class="time-cell"><p>&nbsp;</p></td>
+					<td class="desc-cell"><p><strong>Labor Day</strong></p></td>
+				</tr>
+			</tbody>
+		</table>
+	`)
+
+	events, err := parseBLSSchedule(body, 2026)
+	require.NoError(t, err)
+	require.Len(t, events, 2)
+	require.Equal(t, "Consumer Price Index for August 2026", events[0].Title)
+	require.Equal(t, "USD", events[0].Country)
+	require.Equal(t, "high", events[0].Impact)
+	require.Equal(t, "2026-09-11T12:30:00Z", events[0].Time.Format("2006-01-02T15:04:05Z"))
+	require.Equal(t, "Labor Day", events[1].Title)
+	require.Equal(t, "low", events[1].Impact)
+	require.Equal(t, "2026-09-07T12:30:00Z", events[1].Time.Format("2006-01-02T15:04:05Z"))
+}
+
 func TestNewProviderDefaultsToOfficialUS(t *testing.T) {
 	require.Equal(t, "official-us", NewProvider("", "").Name())
 	require.Equal(t, "official-us", NewProvider("unknown", "").Name())

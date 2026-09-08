@@ -13,15 +13,15 @@ import (
 )
 
 const (
-	DefaultBLSScheduleURL = "https://www.bls.gov/schedule/news_release/content/%d/%dnews_releases_public.rss"
+	DefaultBLSScheduleURL = "https://www.bls.gov/schedule/news_release/current_year.asp"
 	DefaultBEAScheduleURL = "https://www.bea.gov/news/schedule"
 )
 
 type OfficialUSProvider struct {
 	Client *http.Client
 
-	BLSURLTemplate string
-	BEAURL         string
+	BLSURL string
+	BEAURL string
 }
 
 func NewOfficialUSProvider() *OfficialUSProvider {
@@ -83,31 +83,15 @@ func (p *OfficialUSProvider) get(ctx context.Context, url, accept string) ([]byt
 }
 
 func (p *OfficialUSProvider) fetchBLS(ctx context.Context) ([]Event, error) {
-	tmpl := p.BLSURLTemplate
-	if tmpl == "" {
-		tmpl = DefaultBLSScheduleURL
+	url := p.BLSURL
+	if url == "" {
+		url = DefaultBLSScheduleURL
 	}
-	now := time.Now().UTC()
-	years := []int{now.Year(), now.Year() + 1}
-	var events []Event
-	var errs []string
-	for _, year := range years {
-		body, err := p.get(ctx, fmt.Sprintf(tmpl, year, year), "application/rss+xml, application/xml, text/xml")
-		if err != nil {
-			errs = append(errs, fmt.Sprintf("bls %d: %v", year, err))
-			continue
-		}
-		rows, err := parseBLSRSS(body, year)
-		if err != nil {
-			errs = append(errs, fmt.Sprintf("bls %d: %v", year, err))
-			continue
-		}
-		events = append(events, rows...)
+	body, err := p.get(ctx, url, "text/html, application/xhtml+xml")
+	if err != nil {
+		return nil, fmt.Errorf("bls: %w", err)
 	}
-	if len(events) == 0 && len(errs) > 0 {
-		return nil, fmt.Errorf("%s", strings.Join(errs, "; "))
-	}
-	return events, nil
+	return parseBLSSchedule(body, time.Now().UTC().Year())
 }
 
 func (p *OfficialUSProvider) fetchBEA(ctx context.Context) ([]Event, error) {
@@ -145,6 +129,35 @@ func parseBLSRSS(body []byte, fallbackYear int) ([]Event, error) {
 			continue
 		}
 		at, ok := parseOfficialDate(item.Description+" "+item.PubDate+" "+item.Title, fallbackYear)
+		if !ok {
+			continue
+		}
+		events = append(events, Event{
+			Title:   title,
+			Country: "USD",
+			Impact:  impactForTitle(title),
+			Time:    at,
+		})
+	}
+	return events, nil
+}
+
+var blsRowRe = regexp.MustCompile(`(?is)<tr[^>]*>.*?<td[^>]*class="[^"]*\bdate-cell\b[^"]*"[^>]*>\s*<p[^>]*>(.*?)</p>\s*</td>\s*<td[^>]*class="[^"]*\btime-cell\b[^"]*"[^>]*>\s*<p[^>]*>(.*?)</p>\s*</td>\s*<td[^>]*class="[^"]*\bdesc-cell\b[^"]*"[^>]*>\s*<p[^>]*>(.*?)</p>\s*</td>.*?</tr>`)
+
+func parseBLSSchedule(body []byte, fallbackYear int) ([]Event, error) {
+	matches := blsRowRe.FindAllSubmatch(body, -1)
+	events := make([]Event, 0, len(matches))
+	for _, m := range matches {
+		dateText := cleanText(string(m[1]))
+		timeText := cleanText(string(m[2]))
+		title := cleanText(string(m[3]))
+		if title == "" || dateText == "" {
+			continue
+		}
+		if timeText == "" {
+			timeText = "8:30 AM"
+		}
+		at, ok := parseOfficialDate(dateText+" "+timeText, fallbackYear)
 		if !ok {
 			continue
 		}
