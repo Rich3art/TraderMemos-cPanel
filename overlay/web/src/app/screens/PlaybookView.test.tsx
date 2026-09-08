@@ -40,7 +40,9 @@ const setup: Setup = {
   checklist: ["Above VWAP"],
 };
 const group: BreakGroup = {
+  id: "s1",
   key: "ORB",
+  max_drawdown: 150,
   summary: {
     total_trades: 5,
     wins: 3,
@@ -58,6 +60,31 @@ const group: BreakGroup = {
     largest_win: 300,
     largest_loss: 120,
     total_fees: 10,
+  },
+  r_summary: {
+    total_trades: 5,
+    wins: 3,
+    losses: 2,
+    breakeven: 0,
+    win_rate: 0.6,
+    net_pnl: 4,
+    gross_profit: 6,
+    gross_loss: 2,
+    profit_factor: 3,
+    expectancy: 0.8,
+    avg_win: 2,
+    avg_loss: 1,
+    avg_trade: 0.8,
+    largest_win: 2.5,
+    largest_loss: 1.2,
+    total_fees: 0,
+    excluded: 1,
+    avg_r: 0.8,
+    avg_win_r: 2,
+    avg_loss_r: -1,
+    best_r: 2.5,
+    worst_r: -1.2,
+    distribution: [],
   },
 } as BreakGroup;
 
@@ -113,6 +140,19 @@ describe("PlaybookView", () => {
     expect(screen.getByText("1/1")).toBeInTheDocument();
     expect(screen.getByText("Top play")).toBeInTheDocument();
     expect(screen.getByText("3 of 5 won")).toBeInTheDocument();
+  });
+
+  it("shows playbook profitability and R analysis", () => {
+    wrap(<PlaybookView {...base} setups={[setup]} breakdown={[group]} />);
+    expect(screen.getByText("Playbook performance")).toBeInTheDocument();
+    expect(screen.getByText("Best performer")).toBeInTheDocument();
+    expect(screen.getByText("Most profitable")).toBeInTheDocument();
+    expect(screen.getByText("Best expectancy")).toBeInTheDocument();
+    expect(screen.getByText("Best average R")).toBeInTheDocument();
+    expect(screen.getAllByText("+0.80R").length).toBeGreaterThan(0);
+    expect(screen.getByText("+4.00R")).toBeInTheDocument();
+    expect(screen.getAllByText("Small sample").length).toBeGreaterThan(0);
+    expect(screen.getByText("1 trades missing risk")).toBeInTheDocument();
   });
 
   it("shows setup screenshots as playbook examples", () => {

@@ -55,6 +55,7 @@ type SortDir = "asc" | "desc";
 
 interface SetupRowModel {
   setup: Setup;
+  group?: BreakGroup;
   trades: number;
   wins: number;
   losses: number;
@@ -123,11 +124,13 @@ function toSetupDraft(setup: Setup): SetupDraft {
 
 function buildRows(setups: Setup[], breakdown: BreakGroup[]): SetupRowModel[] {
   const summaries = new Map(breakdown.map((g) => [g.key, g.summary]));
+  const groups = new Map(breakdown.map((g) => [g.key, g]));
   return setups.map((setup) => {
     const sum = summaries.get(setup.name);
     const trades = sum?.total_trades ?? 0;
     return {
       setup,
+      group: groups.get(setup.name),
       trades,
       wins: sum?.wins ?? 0,
       losses: sum?.losses ?? 0,
@@ -214,6 +217,40 @@ function PlayExamples({ setup, compact = false }: { setup: Setup; compact?: bool
       ) : null}
     </div>
   );
+}
+
+function formatR(value: number | undefined): string {
+  if (value == null || Number.isNaN(value)) return "—";
+  return `${value > 0 ? "+" : ""}${value.toFixed(2)}R`;
+}
+
+function sampleLabel(trades: number): string {
+  if (trades >= 30) return "Reliable sample";
+  if (trades >= 10) return "Building sample";
+  return "Small sample";
+}
+
+function performanceScore(row: SetupRowModel): number {
+  const r = row.group?.r_summary;
+  const sample = Math.min(row.trades / 20, 1);
+  const pf = Math.min(row.pf || 0, 5) / 5;
+  const expectancy = Math.tanh(row.exp / 100);
+  const avgR = r ? Math.tanh(r.avg_r) : 0;
+  const drawdownPenalty = row.group?.max_drawdown ? Math.min(row.group.max_drawdown / 1000, 1) : 0;
+  return sample * (row.winRate * 0.2 + pf * 0.25 + expectancy * 0.25 + avgR * 0.3) - drawdownPenalty * 0.15;
+}
+
+function pickBest(
+  rows: SetupRowModel[],
+  read: (row: SetupRowModel) => number | undefined,
+): SetupRowModel | null {
+  return rows.reduce<SetupRowModel | null>((best, row) => {
+    const value = read(row);
+    if (value == null || Number.isNaN(value)) return best;
+    if (best == null) return row;
+    const bestValue = read(best);
+    return bestValue == null || value > bestValue ? row : best;
+  }, null);
 }
 
 // ---------------------------------------------------------------------------
@@ -601,6 +638,151 @@ function SummaryStat({
   );
 }
 
+function PerformanceStat({
+  label,
+  row,
+  value,
+  sub,
+  valueClass,
+}: {
+  label: string;
+  row: SetupRowModel | null;
+  value: string;
+  sub?: string;
+  valueClass?: string;
+}) {
+  return (
+    <div className="min-w-0 rounded-md border border-border bg-card px-3 py-3">
+      <span className="text-[10px] font-medium tracking-[0.08em] text-muted-foreground uppercase">
+        {label}
+      </span>
+      <div className="mt-2 flex min-w-0 items-baseline justify-between gap-3">
+        <span className="truncate text-[13px] font-semibold text-foreground">
+          {row?.setup.name ?? "—"}
+        </span>
+        <span className={cn("shrink-0 text-[13px] font-semibold tabular-nums", valueClass)}>
+          {value}
+        </span>
+      </div>
+      {sub ? <p className="mt-1 truncate text-[11px] text-muted-foreground">{sub}</p> : null}
+    </div>
+  );
+}
+
+function PlaybookPerformancePanel({
+  rows,
+  currency,
+  fxRate,
+}: {
+  rows: SetupRowModel[];
+  currency: string;
+  fxRate: number;
+}) {
+  const locale = intlLocale();
+  const money = (v: number) => fmtSignedMoney(v * fxRate, currency, locale);
+  const ranked = [...rows].sort((a, b) => performanceScore(b) - performanceScore(a));
+  const bestOverall = ranked[0] ?? null;
+  const mostProfitable = pickBest(rows, (row) => row.netPnl);
+  const bestExpectancy = pickBest(rows, (row) => row.exp);
+  const bestR = pickBest(rows, (row) => row.group?.r_summary?.avg_r);
+
+  return (
+    <Card>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="text-[13px] font-semibold tracking-tight text-foreground">
+            Playbook performance
+          </h3>
+          <p className="mt-0.5 text-[12px] text-muted-foreground">
+            Ranking combines profitability, expectancy, R stats, drawdown, and sample size.
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <PerformanceStat
+          label="Best performer"
+          row={bestOverall}
+          value={bestOverall ? `${Math.round(performanceScore(bestOverall) * 100)}` : "—"}
+          sub={bestOverall ? sampleLabel(bestOverall.trades) : undefined}
+        />
+        <PerformanceStat
+          label="Most profitable"
+          row={mostProfitable}
+          value={mostProfitable ? money(mostProfitable.netPnl) : "—"}
+          valueClass={mostProfitable ? pnlColor(mostProfitable.netPnl) : undefined}
+          sub={mostProfitable ? `${mostProfitable.trades} trades` : undefined}
+        />
+        <PerformanceStat
+          label="Best expectancy"
+          row={bestExpectancy}
+          value={bestExpectancy ? money(bestExpectancy.exp) : "—"}
+          valueClass={bestExpectancy ? pnlColor(bestExpectancy.exp) : undefined}
+          sub={bestExpectancy ? `${fmtPct(bestExpectancy.winRate, locale)} win rate` : undefined}
+        />
+        <PerformanceStat
+          label="Best average R"
+          row={bestR}
+          value={bestR ? formatR(bestR.group?.r_summary?.avg_r) : "—"}
+          valueClass={bestR ? pnlColor(bestR.group?.r_summary?.avg_r ?? 0) : undefined}
+          sub={bestR ? `${bestR.group?.r_summary?.excluded ?? 0} trades missing risk` : undefined}
+        />
+      </div>
+
+      <div className="mt-4 overflow-x-auto">
+        <table className="w-full min-w-[46rem] text-left text-[12px]">
+          <thead className="text-[10px] tracking-[0.08em] text-muted-foreground uppercase">
+            <tr className="border-b border-border">
+              <th className="py-2 pr-3 font-medium">Playbook</th>
+              <th className="px-3 py-2 text-right font-medium">Sample</th>
+              <th className="px-3 py-2 text-right font-medium">Avg R</th>
+              <th className="px-3 py-2 text-right font-medium">Total R</th>
+              <th className="px-3 py-2 text-right font-medium">Avg win</th>
+              <th className="px-3 py-2 text-right font-medium">Avg loss</th>
+              <th className="px-3 py-2 text-right font-medium">Drawdown</th>
+              <th className="py-2 pl-3 text-right font-medium">Missing risk</th>
+            </tr>
+          </thead>
+          <tbody>
+            {ranked.map((row) => {
+              const r = row.group?.r_summary;
+              const drawdown = row.group?.max_drawdown ?? 0;
+              return (
+                <tr key={row.setup.id} className="border-b border-border/70 last:border-0">
+                  <td className="py-2 pr-3 font-medium text-foreground">{row.setup.name}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                    {sampleLabel(row.trades)}
+                  </td>
+                  <td className={cn("px-3 py-2 text-right tabular-nums", pnlColor(r?.avg_r ?? 0))}>
+                    {formatR(r?.avg_r)}
+                  </td>
+                  <td
+                    className={cn("px-3 py-2 text-right tabular-nums", pnlColor(r?.net_pnl ?? 0))}
+                  >
+                    {formatR(r?.net_pnl)}
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums text-profit">
+                    {money(row.group?.summary.avg_win ?? 0)}
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums text-destructive">
+                    {money(-(row.group?.summary.avg_loss ?? 0))}
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                    {fmtSignedMoney(-drawdown * fxRate, currency, locale)}
+                  </td>
+                  <td className="py-2 pl-3 text-right tabular-nums text-muted-foreground">
+                    {r?.excluded ?? row.trades}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Main export
 // ---------------------------------------------------------------------------
@@ -900,6 +1082,9 @@ export function PlaybookView({
     return (
       <>
         {traded.length > 0 ? summaryCard : null}
+        {traded.length > 0 ? (
+          <PlaybookPerformancePanel rows={traded} currency={displayCurrency} fxRate={fxRate} />
+        ) : null}
         {traded.length > 0 ? tradedCard : null}
         {unused.length > 0 && !hideUnused ? unusedCard : null}
       </>

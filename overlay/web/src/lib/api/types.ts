@@ -370,7 +370,10 @@ export interface MonteCarloResult {
 // BreakGroup matches analytics.BreakGroup from analytics/breakdown.go
 export interface BreakGroup {
   key: string;
+  id?: string;
   summary: Summary;
+  max_drawdown?: number;
+  r_summary?: RSummary;
 }
 
 export interface CashTransaction {
