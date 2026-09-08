@@ -320,6 +320,22 @@ func (p *PG) GetCoachSettings(ctx context.Context) (CoachSetting, error) {
 	return CoachSetting(v), nil
 }
 
+func (p *PG) GetEconomicCalendarAISettings(ctx context.Context) (EconomicCalendarAISetting, error) {
+	v, err := p.q.GetEconomicCalendarAISettings(ctx)
+	if err != nil {
+		return EconomicCalendarAISetting{}, err
+	}
+	return EconomicCalendarAISetting{
+		ID:           int64(v.ID),
+		Enabled:      int64(v.Enabled),
+		BaseUrl:      v.BaseUrl,
+		ApiKey:       v.ApiKey,
+		Model:        v.Model,
+		CustomPrompt: v.CustomPrompt,
+		UpdatedAt:    v.UpdatedAt,
+	}, nil
+}
+
 func (p *PG) GetEconomicEventsLastFetch(ctx context.Context, provider string) (string, error) {
 	return p.q.GetEconomicEventsLastFetch(ctx, provider)
 }
@@ -1297,6 +1313,28 @@ func (p *PG) UpsertCoachSettings(ctx context.Context, arg UpsertCoachSettingsPar
 		return CoachSetting{}, err
 	}
 	return CoachSetting(v), nil
+}
+
+func (p *PG) UpsertEconomicCalendarAISettings(ctx context.Context, arg UpsertEconomicCalendarAISettingsParams) (EconomicCalendarAISetting, error) {
+	v, err := p.q.UpsertEconomicCalendarAISettings(ctx, storepg.UpsertEconomicCalendarAISettingsParams{
+		Enabled:      int32(arg.Enabled),
+		BaseUrl:      arg.BaseUrl,
+		ApiKey:       arg.ApiKey,
+		Model:        arg.Model,
+		CustomPrompt: arg.CustomPrompt,
+	})
+	if err != nil {
+		return EconomicCalendarAISetting{}, err
+	}
+	return EconomicCalendarAISetting{
+		ID:           int64(v.ID),
+		Enabled:      int64(v.Enabled),
+		BaseUrl:      v.BaseUrl,
+		ApiKey:       v.ApiKey,
+		Model:        v.Model,
+		CustomPrompt: v.CustomPrompt,
+		UpdatedAt:    v.UpdatedAt,
+	}, nil
 }
 
 func (p *PG) UpsertEconomicEvent(ctx context.Context, arg UpsertEconomicEventParams) error {

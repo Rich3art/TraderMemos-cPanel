@@ -16,6 +16,8 @@ export type { LlmApiModelsResult as OcrModelsResult };
 
 export type CoachSettings = LlmApiSettings;
 export type CoachSettingsPut = LlmApiSettingsPut;
+export type EconomicCalendarAISettings = LlmApiSettings;
+export type EconomicCalendarAISettingsPut = LlmApiSettingsPut;
 
 export interface RiskRules {
   max_risk_per_trade: number | null;
@@ -104,6 +106,23 @@ export const settingsApi = {
     }),
   listCoachModels: (body: LlmApiModelsRequest = {}) =>
     apiFetch<LlmApiModelsResult>("/settings/coach/models", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  getEconomicCalendarAISettings: () =>
+    apiFetch<EconomicCalendarAISettings>("/settings/economic-calendar-ai"),
+  putEconomicCalendarAISettings: (body: EconomicCalendarAISettingsPut) =>
+    apiFetch<EconomicCalendarAISettings>("/settings/economic-calendar-ai", {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  testEconomicCalendarAISettings: (body: LlmApiSettingsTestRequest = {}) =>
+    apiFetch<LlmApiSettingsTestResult>("/settings/economic-calendar-ai/test", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  listEconomicCalendarAIModels: (body: LlmApiModelsRequest = {}) =>
+    apiFetch<LlmApiModelsResult>("/settings/economic-calendar-ai/models", {
       method: "POST",
       body: JSON.stringify(body),
     }),

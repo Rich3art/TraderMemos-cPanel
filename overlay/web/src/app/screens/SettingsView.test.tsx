@@ -118,6 +118,34 @@ vi.mock("../../lib/hooks/useCoachSettings", () => ({
   useListCoachModels: () => ({ mutateAsync: vi.fn<(...args: any[]) => any>(), isPending: false }),
 }));
 
+vi.mock("../../lib/hooks/useEconomicCalendarAISettings", () => ({
+  useEconomicCalendarAISettings: () => ({
+    data: {
+      enabled: false,
+      base_url: "",
+      model: "",
+      api_key_set: false,
+      api_key_hint: "",
+      custom_prompt: "",
+      default_prompt: "",
+    },
+    isPending: false,
+    isError: false,
+  }),
+  useSaveEconomicCalendarAISettings: () => ({
+    mutateAsync: vi.fn<(...args: any[]) => any>(),
+    isPending: false,
+  }),
+  useTestEconomicCalendarAISettings: () => ({
+    mutateAsync: vi.fn<(...args: any[]) => any>(),
+    isPending: false,
+  }),
+  useListEconomicCalendarAIModels: () => ({
+    mutateAsync: vi.fn<(...args: any[]) => any>(),
+    isPending: false,
+  }),
+}));
+
 const savePsychologyQuestions = vi.hoisted(() =>
   vi.fn<(...args: any[]) => any>(async (body) => body),
 );

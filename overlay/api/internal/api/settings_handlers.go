@@ -26,6 +26,10 @@ func (s *Server) settingsRoutes(g *echo.Group) {
 	g.PUT("/settings/coach", s.handlePutCoachSettings)
 	g.POST("/settings/coach/test", s.handleTestCoachSettings)
 	g.POST("/settings/coach/models", s.handleListCoachModels)
+	g.GET("/settings/economic-calendar-ai", s.handleGetEconomicCalendarAISettings)
+	g.PUT("/settings/economic-calendar-ai", s.handlePutEconomicCalendarAISettings)
+	g.POST("/settings/economic-calendar-ai/test", s.handleTestEconomicCalendarAISettings)
+	g.POST("/settings/economic-calendar-ai/models", s.handleListEconomicCalendarAIModels)
 }
 
 type riskRulesDTO struct {

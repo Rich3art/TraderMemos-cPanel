@@ -57,6 +57,12 @@ import {
   useSaveCoachSettings,
   useTestCoachSettings,
 } from "@/lib/hooks/useCoachSettings";
+import {
+  useEconomicCalendarAISettings,
+  useListEconomicCalendarAIModels,
+  useSaveEconomicCalendarAISettings,
+  useTestEconomicCalendarAISettings,
+} from "@/lib/hooks/useEconomicCalendarAISettings";
 import type { Account, CashTransaction, Tag as TagType } from "@/lib/api/types";
 import { missingMistakePresets } from "@/lib/tagPresets";
 import {
@@ -2088,6 +2094,29 @@ function llmApiLabels(locale: string, prefix: "vision" | "coach"): LlmApiSetting
   };
 }
 
+function economicCalendarAILabels(): LlmApiSettingsLabels {
+  return {
+    enabled: "Economic Calendar AI",
+    enabledDetail: "Use a separate AI prompt and model for economic event impact analysis.",
+    off: "Off",
+    on: "On",
+    baseUrl: "Base URL",
+    baseUrlDetail: "OpenAI-compatible API root URL.",
+    model: "Model",
+    modelDetail: "Model ID used for calendar event analysis.",
+    fetchModels: "Fetch models",
+    fetchingModels: "Fetching models...",
+    apiKey: "API key",
+    apiKeyHint: "Stored securely on the API server; leave blank to keep the existing key.",
+    apiKeyDetail: "Never sent back to the browser after saving.",
+    customPrompt: "System prompt",
+    customPromptHint: "Leave blank to use the built-in economic calendar analysis prompt.",
+    save: "Save",
+    test: "Test",
+    testing: "Testing...",
+  };
+}
+
 function VisionScanSection() {
   const { locale } = useLocale();
   const { data, isPending, isError } = useOcrSettings();
@@ -2156,11 +2185,47 @@ function CoachSection() {
   );
 }
 
+function EconomicCalendarAISection() {
+  const { data, isPending, isError } = useEconomicCalendarAISettings();
+  const save = useSaveEconomicCalendarAISettings();
+  const test = useTestEconomicCalendarAISettings();
+  const listModels = useListEconomicCalendarAIModels();
+
+  return (
+    <SettingsSection
+      title="Economic Calendar AI"
+      footer="This uses its own prompt so event analysis can be controlled separately from the trade coach."
+    >
+      {isPending && !data ? (
+        <SettingsPanelBody>
+          <FormSkeleton fields={3} />
+        </SettingsPanelBody>
+      ) : isError || !data ? (
+        <SettingsPanelBody>
+          <p className="text-[12px] text-destructive">
+            Failed to load economic calendar AI settings.
+          </p>
+        </SettingsPanelBody>
+      ) : (
+        <LlmApiSettingsForm
+          settings={data}
+          labels={economicCalendarAILabels()}
+          saveErrorMessage="Could not save economic calendar AI settings."
+          onSave={(body) => save.mutateAsync(body)}
+          onTest={(body) => test.mutateAsync(body)}
+          onListModels={(body) => listModels.mutateAsync(body)}
+        />
+      )}
+    </SettingsSection>
+  );
+}
+
 export function AiTab() {
   return (
     <>
       <VisionScanSection />
       <CoachSection />
+      <EconomicCalendarAISection />
     </>
   );
 }
