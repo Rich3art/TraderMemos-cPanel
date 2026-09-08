@@ -1,10 +1,24 @@
-import { ChevronUp, Clock3, Radio } from "lucide-react";
+import { ChevronDown, ChevronUp, Clock3 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/cn";
-import { resolveDisplayTimezone, useDisplayTimePrefs } from "@/lib/displayPrefs";
+import {
+  formatUtcOffsetPrefix,
+  resolveDisplayTimezone,
+  timezoneSelectOptions,
+  useDisplayPrefs,
+  useDisplayTimePrefs,
+  type TimezonePref,
+} from "@/lib/displayPrefs";
 import { intlLocale } from "@/lib/locale";
-import { marketSessionSnapshot } from "@/lib/marketSessions";
+import { type MarketSessionState, marketSessionSnapshot } from "@/lib/marketSessions";
 import { Menu, MenuPopup, MenuTrigger } from "./ui/menu";
+
+const SESSION_FLAGS: Record<MarketSessionState["id"], string> = {
+  sydney: "🇦🇺",
+  tokyo: "🇯🇵",
+  london: "🇬🇧",
+  "new-york": "🇺🇸",
+};
 
 function utcClock(now: Date) {
   return new Intl.DateTimeFormat("en-GB", {
@@ -13,6 +27,46 @@ function utcClock(now: Date) {
     minute: "2-digit",
     hourCycle: "h23",
   }).format(now);
+}
+
+function zoneClock(now: Date, timeZone: string) {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(now);
+}
+
+function nowMarkerPercent(now: Date, timeZone: string) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(now);
+  const hour = Number(parts.find((p) => p.type === "hour")?.value ?? "0");
+  const minute = Number(parts.find((p) => p.type === "minute")?.value ?? "0");
+  return ((hour * 60 + minute) / 1440) * 100;
+}
+
+function timelineSegments(session: MarketSessionState): { left: number; width: number }[] {
+  const start = (session.userOpenMinute / 1440) * 100;
+  const end = (session.userCloseMinute / 1440) * 100;
+  if (end > start) return [{ left: start, width: end - start }];
+  return [
+    { left: start, width: 100 - start },
+    { left: 0, width: end },
+  ];
+}
+
+function displayTimezoneLabel(value: TimezonePref, resolvedTimeZone: string, now: Date) {
+  const offset = formatUtcOffsetPrefix(resolvedTimeZone, now).replace(/(UTC[+-]\d{2})$/, "$1:00");
+  if (value === "local") return `Local (${offset})`;
+  if (value === "UTC") return "UTC (UTC+00:00)";
+  const option = timezoneSelectOptions(now).find((o) => o.value === value);
+  const name = (option?.label ?? value).replace(/^UTC[+-]\d{2}(?::\d{2})?\s*/, "");
+  return `${name} (${offset})`;
 }
 
 function useMinuteClock() {
@@ -28,12 +82,17 @@ export function MarketSessionClock() {
   const now = useMinuteClock();
   const locale = intlLocale();
   const { timezone } = useDisplayTimePrefs();
+  const setTimezone = useDisplayPrefs((s) => s.setTimezone);
   const userTimeZone = resolveDisplayTimezone(timezone);
   const snapshot = useMemo(
     () => marketSessionSnapshot(now, locale, userTimeZone),
     [now, locale, userTimeZone],
   );
   const next = snapshot.nextTransition?.nextTransitionLabel ?? "";
+  const activeSession = snapshot.openSessions[0] ?? snapshot.nextTransition ?? snapshot.sessions[0];
+  const marker = nowMarkerPercent(now, userTimeZone);
+  const timezoneOptions = useMemo(() => timezoneSelectOptions(now), [now]);
+  const timezoneLabel = displayTimezoneLabel(timezone, userTimeZone, now);
 
   return (
     <Menu>
@@ -68,74 +127,128 @@ export function MarketSessionClock() {
           className="text-muted-foreground transition-transform group-data-[popup-open]:rotate-180"
         />
       </MenuTrigger>
-      <MenuPopup side="bottom" align="end" sideOffset={8} className="w-78 p-0">
+      <MenuPopup
+        side="bottom"
+        align="end"
+        sideOffset={8}
+        className="w-[min(35rem,calc(100vw-1rem))] overflow-hidden rounded-lg border-[#1b2d4a] bg-[#071225] p-0 text-slate-100 shadow-2xl"
+      >
         <div className="flex flex-col gap-4 p-4">
-          <div className="flex items-start gap-3">
+          <div className="flex items-center justify-between gap-3">
+            <p className="m-0 text-[11px] font-bold tracking-[0.28em] text-slate-300 uppercase">
+              Trading Sessions
+            </p>
+            <span className="rounded-full border border-sky-500/45 bg-sky-500/15 px-3 py-1 text-[12px] font-bold tabular-nums text-sky-300">
+              {utcClock(now)} UTC
+            </span>
+          </div>
+
+          <div className="flex items-center gap-3">
             <span
               aria-hidden
-              className={cn(
-                "mt-1 flex size-9 shrink-0 items-center justify-center rounded-full border",
-                snapshot.anyOpen
-                  ? "border-profit/25 bg-profit/10 text-profit"
-                  : "border-border bg-muted text-muted-foreground",
-              )}
+              className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-500/40 bg-slate-900 text-[21px]"
             >
-              <Radio size={15} strokeWidth={1.75} />
+              {SESSION_FLAGS[activeSession.id]}
             </span>
             <div className="min-w-0">
-              <p className="m-0 text-[15px] font-semibold text-foreground">{snapshot.label}</p>
-              <p className="mt-0.5 text-[12px] text-muted-foreground">{next}</p>
-              {snapshot.overlapLabel ? (
-                <p className="mt-1 text-[12px] text-profit">{snapshot.overlapLabel}</p>
-              ) : null}
+              <p className="m-0 truncate text-[14px] font-bold text-slate-100">
+                {activeSession.label}
+              </p>
+              <p className="mt-0.5 text-[12px] tabular-nums text-slate-400">
+                {timezone === "UTC" ? "UTC" : timezoneLabel} · {zoneClock(now, userTimeZone)}
+              </p>
             </div>
           </div>
 
-          <div className="rounded-md border border-border bg-muted/25 p-3">
-            <div className="mb-3 flex items-center justify-between text-[11px] tabular-nums text-muted-foreground">
-              <span>00</span>
-              <span>06</span>
-              <span>12</span>
-              <span>18</span>
-              <span>24</span>
-            </div>
-            <div className="flex flex-col gap-3">
-              {snapshot.sessions.map((session) => (
-                <div
-                  key={session.id}
-                  className="grid grid-cols-[4.75rem_minmax(0,1fr)_4.75rem] items-center gap-3"
+          <label className="grid min-h-12 grid-cols-[minmax(0,1fr)_minmax(10rem,1fr)] items-center gap-3 rounded-md border border-slate-700/70 bg-[#0b172d] px-3 py-2">
+            <span className="text-[12px] font-semibold text-slate-200">Display timezone</span>
+            <span className="relative min-w-0">
+              <select
+                aria-label="Display timezone"
+                value={timezone}
+                onChange={(e) => setTimezone(e.target.value as TimezonePref)}
+                className="h-8 w-full appearance-none border-0 bg-transparent pr-8 text-right text-[12px] font-semibold text-slate-100 outline-none"
+              >
+                {timezoneOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {displayTimezoneLabel(option.value, resolveDisplayTimezone(option.value), now)}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown
+                size={14}
+                strokeWidth={2}
+                aria-hidden
+                className="pointer-events-none absolute top-1/2 right-1 -translate-y-1/2 text-slate-300"
+              />
+            </span>
+          </label>
+
+          <div className="rounded-md border border-slate-800 bg-[#0a1428] px-3 py-4">
+            <div className="relative grid grid-cols-[5.75rem_minmax(0,1fr)] gap-x-3">
+              <div
+                aria-hidden
+                className="pointer-events-none absolute top-[-0.35rem] right-0 bottom-7 left-[6.5rem] z-10"
+              >
+                <span
+                  className="absolute top-0 bottom-0 w-px bg-slate-200/50"
+                  style={{ left: `${marker}%` }}
                 >
-                  <span className="truncate text-[12px] text-muted-foreground">
-                    {session.label}
-                  </span>
-                  <span className="relative h-2 overflow-hidden rounded-full bg-accent">
+                  <span className="absolute -top-1 left-1/2 size-2 -translate-x-1/2 rounded-full bg-slate-100" />
+                </span>
+              </div>
+              {snapshot.sessions.map((session) => {
+                const segments = timelineSegments(session);
+                return (
+                  <div key={session.id} className="contents">
                     <span
                       className={cn(
-                        "absolute inset-y-0 left-0 rounded-full",
-                        session.open ? "bg-profit/70" : "bg-muted-foreground/25",
-                      )}
-                      style={{ width: `${session.open ? Math.max(session.progress * 100, 8) : 18}%` }}
-                    />
-                  </span>
-                  <span className="text-right text-[12px] tabular-nums text-muted-foreground">
-                    {session.localTime}
-                  </span>
-                  <span className="col-span-3 -mt-1 grid grid-cols-[4.75rem_minmax(0,1fr)] gap-3 text-[11px] text-muted-foreground">
-                    <span
-                      className={cn(
-                        "font-medium",
-                        session.open ? "text-profit" : "text-muted-foreground",
+                        "flex min-w-0 items-center gap-2 py-1.5 text-[12px] font-bold",
+                        session.open ? "text-emerald-300" : "text-slate-300",
                       )}
                     >
-                      {session.statusLabel}
+                      <span className="text-[16px]" aria-hidden>
+                        {SESSION_FLAGS[session.id]}
+                      </span>
+                      <span className="truncate">{session.label}</span>
                     </span>
-                    <span className="min-w-0 truncate">
-                      {session.userLocalRange} local time · {session.nextTransitionLabel}
+                    <span className="relative my-2 h-5 overflow-hidden rounded-full bg-slate-800/60">
+                      {segments.map((segment, index) => (
+                        <span
+                          key={`${session.id}-${index}`}
+                          className={cn(
+                            "absolute top-1/2 h-3 -translate-y-1/2 rounded-full",
+                            session.open
+                              ? "bg-gradient-to-r from-emerald-200 via-cyan-300 to-sky-500"
+                              : "bg-rose-500/20",
+                          )}
+                          style={{ left: `${segment.left}%`, width: `${segment.width}%` }}
+                        />
+                      ))}
                     </span>
-                  </span>
-                </div>
-              ))}
+                  </div>
+                );
+              })}
+              <div className="col-start-2 mt-1 flex justify-between text-[12px] font-bold tabular-nums text-slate-300">
+                <span>00</span>
+                <span>06</span>
+                <span>12</span>
+                <span>18</span>
+                <span>24</span>
+              </div>
             </div>
+          </div>
+
+          <div className="border-t border-slate-800 pt-3 text-[12px] leading-relaxed text-slate-300">
+            <span className="font-bold text-slate-100">
+              {snapshot.nextTransition?.nextTransitionLabel ?? "No scheduled transition."}
+            </span>
+            {snapshot.overlapLabel ? (
+              <>
+                <span className="text-slate-500"> · </span>
+                <span className="text-cyan-300">{snapshot.overlapLabel}</span>
+              </>
+            ) : null}
           </div>
         </div>
       </MenuPopup>

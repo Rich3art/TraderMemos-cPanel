@@ -32,6 +32,8 @@ describe("market sessions", () => {
     expect(snapshot.sessions.find((s) => s.id === "sydney")?.userLocalRange).toBe(
       "1:00 AM - 10:00 AM",
     );
+    expect(snapshot.sessions.find((s) => s.id === "sydney")?.userOpenMinute).toBe(60);
+    expect(snapshot.sessions.find((s) => s.id === "sydney")?.userCloseMinute).toBe(600);
   });
 
   it("opens Sydney on Australia/Sydney daylight saving time", () => {

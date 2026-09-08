@@ -9,6 +9,8 @@ export interface MarketSessionDef {
 export interface MarketSessionState extends MarketSessionDef {
   localTime: string;
   userLocalRange: string;
+  userOpenMinute: number;
+  userCloseMinute: number;
   statusLabel: "Open" | "Closed";
   open: boolean;
   progress: number;
@@ -134,6 +136,11 @@ function formatSessionRange(openAt: Date, closeAt: Date, locale: string, timeZon
   ].join(" - ");
 }
 
+function minuteOfDay(at: Date, timeZone: string): number {
+  const p = zonedParts(at, timeZone);
+  return p.hour * 60 + p.minute;
+}
+
 export function sessionState(
   def: MarketSessionDef,
   now: Date,
@@ -159,6 +166,8 @@ export function sessionState(
       hourCycle: "h23",
     }).format(now),
     userLocalRange: formatSessionRange(openToday, closeToday, locale, userTimeZone),
+    userOpenMinute: minuteOfDay(openToday, userTimeZone),
+    userCloseMinute: minuteOfDay(closeToday, userTimeZone),
     statusLabel: open ? "Open" : "Closed",
     open,
     progress: Math.min(Math.max(progress, 0), 1),
