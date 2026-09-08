@@ -1,17 +1,54 @@
 package api
 
 import (
+	"database/sql"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/labstack/echo/v5"
 	"github.com/tradermemos/api/internal/marketdata"
+	"github.com/tradermemos/api/internal/store"
 )
 
 func (s *Server) marketRoutes(g *echo.Group) {
 	g.GET("/market/bars", s.handleMarketBars)
 	g.GET("/market/fx", s.handleMarketFx)
+	g.GET("/market/instrument-spec", s.handleInstrumentSpec)
+}
+
+func (s *Server) handleInstrumentSpec(c *echo.Context) error {
+	symbol := strings.TrimSpace(c.QueryParam("symbol"))
+	if symbol == "" {
+		return Fail(http.StatusBadRequest, "bad_request", "symbol is required", nil)
+	}
+	instrumentType := strings.TrimSpace(c.QueryParam("instrument_type"))
+	if instrumentType == "" {
+		instrumentType = "stock"
+	}
+	spec, err := s.deps.Store.GetInstrumentSpec(c.Request().Context(), store.GetInstrumentSpecParams{
+		SymbolRoot:     instrumentSpecRoot(symbol, instrumentType),
+		InstrumentType: instrumentType,
+	})
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return Fail(http.StatusNotFound, "not_found", "instrument spec not found", nil)
+		}
+		return Fail(http.StatusInternalServerError, "internal", "could not load instrument spec", nil)
+	}
+	return c.JSON(http.StatusOK, spec)
+}
+
+func instrumentSpecRoot(symbol, instrumentType string) string {
+	s := strings.ToUpper(strings.TrimSpace(symbol))
+	if instrumentType == "future" {
+		s = strings.TrimPrefix(s, "/")
+		s = strings.TrimPrefix(s, "@")
+		if i := strings.IndexAny(s, " \t"); i > 0 {
+			s = s[:i]
+		}
+	}
+	return s
 }
 
 func (s *Server) handleMarketFx(c *echo.Context) error {

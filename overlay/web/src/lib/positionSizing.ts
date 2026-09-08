@@ -18,6 +18,8 @@ export interface PositionSizingInput {
   marginAmount: number | null;
   marginPercent: number | null;
   multiplier: number;
+  tickSize?: number | null;
+  tickValue?: number | null;
 }
 
 export interface PositionSizingResult {
@@ -33,6 +35,7 @@ export interface PositionSizingResult {
   marginAmount: number | null;
   marginPercent: number | null;
   notional: number | null;
+  valueModel: "tick_value" | "multiplier";
   issues: string[];
 }
 
@@ -61,11 +64,26 @@ export function calculatePositionSizing(input: PositionSizingInput): PositionSiz
   const stop = positive(input.stopPrice);
   const target = positive(input.takeProfitPrice);
   const multiplier = positive(input.multiplier) ?? 1;
+  const tickSize = positive(input.tickSize);
+  const tickValue = positive(input.tickValue);
+  const valueModel = tickSize != null && tickValue != null ? "tick_value" : "multiplier";
   const issues: string[] = [];
 
   const riskPerUnit = entry != null && stop != null ? priceRisk(input.side, entry, stop) : null;
   const rewardPerUnit =
     entry != null && target != null ? priceReward(input.side, entry, target) : null;
+  const riskValuePerUnit =
+    riskPerUnit != null
+      ? valueModel === "tick_value"
+        ? (riskPerUnit / tickSize!) * tickValue!
+        : riskPerUnit * multiplier
+      : null;
+  const rewardValuePerUnit =
+    rewardPerUnit != null
+      ? valueModel === "tick_value"
+        ? (rewardPerUnit / tickSize!) * tickValue!
+        : rewardPerUnit * multiplier
+      : null;
   if (entry != null && stop != null && riskPerUnit == null) {
     issues.push(
       input.side === "long"
@@ -90,14 +108,14 @@ export function calculatePositionSizing(input: PositionSizingInput): PositionSiz
   if (input.mode === "risk_pct") {
     monetaryRisk = balance != null && riskPercent != null ? (balance * riskPercent) / 100 : null;
     units =
-      monetaryRisk != null && riskPerUnit != null ? monetaryRisk / (riskPerUnit * multiplier) : null;
+      monetaryRisk != null && riskValuePerUnit != null ? monetaryRisk / riskValuePerUnit : null;
   } else if (input.mode === "risk_amount") {
     riskPercent = balance != null && monetaryRisk != null ? (monetaryRisk / balance) * 100 : null;
     units =
-      monetaryRisk != null && riskPerUnit != null ? monetaryRisk / (riskPerUnit * multiplier) : null;
+      monetaryRisk != null && riskValuePerUnit != null ? monetaryRisk / riskValuePerUnit : null;
   } else if (input.mode === "units") {
     monetaryRisk =
-      units != null && riskPerUnit != null ? units * riskPerUnit * multiplier : null;
+      units != null && riskValuePerUnit != null ? units * riskValuePerUnit : null;
     riskPercent =
       balance != null && monetaryRisk != null ? (monetaryRisk / balance) * 100 : null;
   } else if (input.mode === "margin_amount") {
@@ -109,7 +127,7 @@ export function calculatePositionSizing(input: PositionSizingInput): PositionSiz
 
   const notional = units != null && entry != null ? units * entry * multiplier : null;
   const potentialProfit =
-    units != null && rewardPerUnit != null ? units * rewardPerUnit * multiplier : null;
+    units != null && rewardValuePerUnit != null ? units * rewardValuePerUnit : null;
   const riskReward =
     monetaryRisk != null && monetaryRisk > 0 && potentialProfit != null
       ? potentialProfit / monetaryRisk
@@ -133,6 +151,7 @@ export function calculatePositionSizing(input: PositionSizingInput): PositionSiz
     marginAmount: marginAmount != null ? round(marginAmount, 2) : null,
     marginPercent: marginPercent != null ? round(marginPercent, 4) : null,
     notional: notional != null ? round(notional, 2) : null,
+    valueModel,
     issues,
   };
 }

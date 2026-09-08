@@ -4,7 +4,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"math"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 	"uuid"
@@ -76,6 +78,9 @@ func (s *Server) handleCreateExecution(c *echo.Context) error {
 	}
 	if in.InstrumentType == "" {
 		in.InstrumentType = "stock"
+	}
+	if err := s.upsertExecutionInstrumentSpec(c, in); err != nil {
+		return Fail(http.StatusInternalServerError, "internal", "could not save instrument spec", nil)
 	}
 	in.Multiplier = importer.ResolveMultiplier(
 		c.Request().Context(), s.deps.Store, in.InstrumentType, in.Symbol, in.Multiplier,
@@ -152,6 +157,55 @@ func (s *Server) handleCreateExecution(c *echo.Context) error {
 		"execution_id": execID,
 		"trade_id":     tradeID,
 	})
+}
+
+func (s *Server) upsertExecutionInstrumentSpec(c *echo.Context, in createExecutionReq) error {
+	tickSize := positiveDetailFloat(in.Details, "tick_size")
+	tickValue := positiveDetailFloat(in.Details, "tick_value")
+	if tickSize == 0 || tickValue == 0 {
+		return nil
+	}
+	multiplier := positiveDetailFloat(in.Details, "contract_size")
+	if multiplier == 0 {
+		multiplier = in.Multiplier
+	}
+	if multiplier == 0 {
+		multiplier = defaultExecutionMultiplier(in.InstrumentType)
+	}
+	currency := strings.ToUpper(strings.TrimSpace(in.Details["profit_currency"]))
+	if currency == "" {
+		currency = strings.ToUpper(strings.TrimSpace(in.Details["account_currency"]))
+	}
+	if currency == "" {
+		currency = "USD"
+	}
+	return s.deps.Store.UpsertInstrumentSpec(c.Request().Context(), store.UpsertInstrumentSpecParams{
+		ID:             uuid.New().String(),
+		SymbolRoot:     instrumentSpecRoot(in.Symbol, in.InstrumentType),
+		InstrumentType: in.InstrumentType,
+		TickSize:       tickSize,
+		TickValue:      tickValue,
+		Multiplier:     multiplier,
+		Currency:       currency,
+	})
+}
+
+func defaultExecutionMultiplier(instrumentType string) float64 {
+	if instrumentType == "option" {
+		return 100
+	}
+	return 1
+}
+
+func positiveDetailFloat(details map[string]string, key string) float64 {
+	if details == nil {
+		return 0
+	}
+	n, err := strconv.ParseFloat(strings.TrimSpace(details[key]), 64)
+	if err != nil || n <= 0 || math.IsNaN(n) || math.IsInf(n, 0) {
+		return 0
+	}
+	return n
 }
 
 func executionDetailsSQL(details map[string]string) (sql.NullString, bool) {

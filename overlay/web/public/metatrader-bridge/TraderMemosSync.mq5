@@ -1,7 +1,7 @@
 // TraderMemosSync.mq5
 // Attach this Expert Advisor to any MT5 chart to send filled deals to TraderMemos.
 #property strict
-#property version "1.16"
+#property version "1.17"
 
 input string TraderMemosServer = "https://journal.ranksmedia.com";
 input string TraderMemosToken = "";
@@ -48,6 +48,16 @@ string AccountMetricsJson()
    payload += "\"account_free_margin\":\"" + DoubleToString(AccountInfoDouble(ACCOUNT_MARGIN_FREE), 2) + "\",";
    payload += "\"account_margin_level\":\"" + DoubleToString(AccountInfoDouble(ACCOUNT_MARGIN_LEVEL), 2) + "\",";
    payload += "\"account_leverage\":\"" + IntegerToString((int)AccountInfoInteger(ACCOUNT_LEVERAGE)) + "\"";
+   return payload;
+}
+
+string InstrumentSpecJson(string symbol)
+{
+   string payload = "";
+   payload += "\"tick_size\":\"" + DoubleToString(SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_SIZE), 10) + "\",";
+   payload += "\"tick_value\":\"" + DoubleToString(SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_VALUE), 10) + "\",";
+   payload += "\"contract_size\":\"" + DoubleToString(SymbolInfoDouble(symbol, SYMBOL_TRADE_CONTRACT_SIZE), 8) + "\",";
+   payload += "\"profit_currency\":\"" + JsonEscape(SymbolInfoString(symbol, SYMBOL_CURRENCY_PROFIT)) + "\"";
    return payload;
 }
 
@@ -108,7 +118,7 @@ int PostExecution(ulong ticket)
    payload += "\"commission\":" + DoubleToString(commission, 8) + ",";
    payload += "\"executed_at\":\"" + IsoUtc(executedAt) + "\",";
    payload += "\"multiplier\":" + DoubleToString(MultiplierFor(symbol, instrument), 2) + ",";
-   payload += "\"details\":{\"source\":\"metatrader5\",\"ticket\":\"" + IntegerToString((long)ticket) + "\",\"lot\":\"mt5-position-" + IntegerToString(positionId) + "\",\"position_id\":\"" + IntegerToString(positionId) + "\",\"broker_profit\":\"" + DoubleToString(profit, 8) + "\"," + AccountMetricsJson() + "}";
+   payload += "\"details\":{\"source\":\"metatrader5\",\"ticket\":\"" + IntegerToString((long)ticket) + "\",\"lot\":\"mt5-position-" + IntegerToString(positionId) + "\",\"position_id\":\"" + IntegerToString(positionId) + "\",\"broker_profit\":\"" + DoubleToString(profit, 8) + "\"," + AccountMetricsJson() + "," + InstrumentSpecJson(symbol) + "}";
    payload += "}";
 
    uchar body[];

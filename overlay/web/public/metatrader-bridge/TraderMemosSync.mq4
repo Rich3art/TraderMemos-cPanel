@@ -1,7 +1,7 @@
 // TraderMemosSync.mq4
 // Attach this Expert Advisor to any MT4 chart to send closed order fills to TraderMemos.
 #property strict
-#property version "1.12"
+#property version "1.13"
 
 input string TraderMemosServer = "https://journal.ranksmedia.com";
 input string TraderMemosToken = "";
@@ -47,6 +47,16 @@ string AccountMetricsJson()
    payload += "\"account_margin\":\"" + DoubleToString(AccountMargin(), 2) + "\",";
    payload += "\"account_free_margin\":\"" + DoubleToString(AccountFreeMargin(), 2) + "\",";
    payload += "\"account_leverage\":\"" + IntegerToString(AccountLeverage()) + "\"";
+   return payload;
+}
+
+string InstrumentSpecJson(string symbol)
+{
+   string payload = "";
+   payload += "\"tick_size\":\"" + DoubleToString(MarketInfo(symbol, MODE_TICKSIZE), 10) + "\",";
+   payload += "\"tick_value\":\"" + DoubleToString(MarketInfo(symbol, MODE_TICKVALUE), 10) + "\",";
+   payload += "\"contract_size\":\"" + DoubleToString(MarketInfo(symbol, MODE_LOTSIZE), 8) + "\",";
+   payload += "\"profit_currency\":\"" + JsonEscape(AccountCurrency()) + "\"";
    return payload;
 }
 
@@ -101,7 +111,7 @@ int PostExecution(int ticket, string suffix, string side, datetime executedAt, d
    payload += "\"executed_at\":\"" + IsoUtc(executedAt) + "\",";
    payload += "\"multiplier\":" + DoubleToString(MultiplierFor(symbol, instrument), 2) + ",";
    double profit = suffix == "close" ? OrderProfit() : 0.0;
-   payload += "\"details\":{\"source\":\"metatrader4\",\"ticket\":\"" + IntegerToString(ticket) + "\",\"fill\":\"" + suffix + "\",\"broker_profit\":\"" + DoubleToString(profit, 8) + "\"," + AccountMetricsJson() + "}";
+   payload += "\"details\":{\"source\":\"metatrader4\",\"ticket\":\"" + IntegerToString(ticket) + "\",\"fill\":\"" + suffix + "\",\"broker_profit\":\"" + DoubleToString(profit, 8) + "\"," + AccountMetricsJson() + "," + InstrumentSpecJson(symbol) + "}";
    payload += "}";
 
    char body[];

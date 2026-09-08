@@ -1,4 +1,5 @@
 import { Trans } from "@lingui/react/macro";
+import { useQuery } from "@tanstack/react-query";
 import { useForm, useStore } from "@tanstack/react-form";
 import { useNavigate } from "@tanstack/react-router";
 import {
@@ -64,6 +65,8 @@ import { useToastManager } from "@/components/Toast";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { attachmentsApi } from "@/lib/api/attachments";
 import { cashApi } from "@/lib/api/cash";
+import type { InstrumentSpec } from "@/lib/api/instrumentSpecs";
+import { instrumentSpecsApi } from "@/lib/api/instrumentSpecs";
 import type { TradeExtract } from "@/lib/api/ocr";
 import { tradesApi } from "@/lib/api/trades";
 import { parseAmountToNumber } from "@/lib/amountInput";
@@ -512,6 +515,14 @@ function PositionSizingCalculator({
   entryQty: number | null;
   multiplier: number;
 }) {
+  const symbol = block.symbol.trim().toUpperCase();
+  const specQ = useQuery({
+    queryKey: ["instrument-spec", symbol, block.market],
+    queryFn: () => instrumentSpecsApi.get({ symbol, instrument_type: block.market }),
+    enabled: Boolean(symbol),
+    retry: false,
+  });
+  const spec: InstrumentSpec | null = specQ.data ?? null;
   const [mode, setMode] = useState<PositionSizingMode>("risk_pct");
   const [riskPercent, setRiskPercent] = useState("1");
   const [riskAmount, setRiskAmount] = useState("");
@@ -535,6 +546,8 @@ function PositionSizingCalculator({
         marginAmount: num(marginAmount),
         marginPercent: num(marginPercent),
         multiplier,
+        tickSize: spec?.tick_size ?? null,
+        tickValue: spec?.tick_value ?? null,
       }),
     [
       accountBalance,
@@ -547,6 +560,8 @@ function PositionSizingCalculator({
       multiplier,
       riskAmount,
       riskPercent,
+      spec?.tick_size,
+      spec?.tick_value,
       stopPrice,
       targetPrice,
       units,
@@ -663,7 +678,21 @@ function PositionSizingCalculator({
             <CalcMetric label="Margin" value={metricValue(result.marginAmount, money)} />
             <CalcMetric label="Margin %" value={metricValue(result.marginPercent, pct)} />
             <CalcMetric label="Notional" value={metricValue(result.notional, money)} />
+            <CalcMetric
+              label="Value model"
+              value={
+                result.valueModel === "tick_value"
+                  ? `Broker tick (${spec?.currency || currency})`
+                  : "Multiplier"
+              }
+            />
           </div>
+          {!spec && symbol ? (
+            <div className="rounded-md border border-border bg-background/30 px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
+              No broker instrument spec is stored for this symbol yet. The calculator is using
+              multiplier math until MT4/MT5 syncs real tick size and tick value.
+            </div>
+          ) : null}
           {result.issues.length > 0 ? (
             <div className="rounded-md border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-[11px] leading-relaxed text-amber-200">
               {result.issues.join(" ")}

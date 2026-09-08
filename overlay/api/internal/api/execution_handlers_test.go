@@ -193,3 +193,23 @@ func TestCreateExecutionKeepsMetaTraderPricesAndChangePercent(t *testing.T) {
 	require.Equal(t, 1.0, trade["fees_total"])
 	require.Equal(t, -66.77, trade["gross_pnl"])
 }
+
+func TestCreateExecutionStoresMetaTraderInstrumentSpec(t *testing.T) {
+	s := testServer(t)
+	tok := registerAndLogin(t, s, "mt-spec@x.com")
+	acc := accountID(t, s, tok)
+
+	body := `{"account_id":"` + acc + `","symbol":"XAUUSD","instrument_type":"forex","side":"buy","quantity":0.01,"price":2500,"executed_at":"2026-01-01T10:00:00Z","multiplier":100,"details":{"source":"metatrader5","account_currency":"ZAR","profit_currency":"ZAR","tick_size":"0.01","tick_value":"17.10","contract_size":"100"}}`
+	require.Equal(t, http.StatusCreated, do(s, http.MethodPost, "/api/v1/executions", body, tok).Code)
+
+	rec := do(s, http.MethodGet, "/api/v1/market/instrument-spec?symbol=XAUUSD&instrument_type=forex", "", tok)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	var spec map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &spec))
+	require.Equal(t, "XAUUSD", spec["symbol_root"])
+	require.Equal(t, "forex", spec["instrument_type"])
+	require.Equal(t, 0.01, spec["tick_size"])
+	require.Equal(t, 17.10, spec["tick_value"])
+	require.Equal(t, 100.0, spec["multiplier"])
+	require.Equal(t, "ZAR", spec["currency"])
+}

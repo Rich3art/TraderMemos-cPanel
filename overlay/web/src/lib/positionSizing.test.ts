@@ -103,4 +103,48 @@ describe("calculatePositionSizing", () => {
       }).marginPercent,
     ).toBe(12.5);
   });
+
+  it("uses broker tick value when instrument specs are available", () => {
+    const result = calculatePositionSizing({
+      mode: "units",
+      side: "long",
+      accountBalance: 10000,
+      entryPrice: 1.37595,
+      stopPrice: 1.3818,
+      takeProfitPrice: null,
+      units: 0.01,
+      riskPercent: null,
+      riskAmount: null,
+      marginAmount: null,
+      marginPercent: null,
+      multiplier: 100000,
+      tickSize: 0.00001,
+      tickValue: 17.1,
+    });
+
+    expect(result.valueModel).toBe("tick_value");
+    expect(result.units).toBe(0.01);
+    expect(result.monetaryRisk).toBeNull();
+    expect(result.issues).toContain("For a long trade, stop must be below entry.");
+
+    const shortResult = calculatePositionSizing({
+      mode: "units",
+      side: "short",
+      accountBalance: 10000,
+      entryPrice: 1.37595,
+      stopPrice: 1.3818,
+      takeProfitPrice: 1.35,
+      units: 0.01,
+      riskPercent: null,
+      riskAmount: null,
+      marginAmount: null,
+      marginPercent: null,
+      multiplier: 100000,
+      tickSize: 0.00001,
+      tickValue: 17.1,
+    });
+
+    expect(shortResult.valueModel).toBe("tick_value");
+    expect(shortResult.monetaryRisk).toBeCloseTo(100.04, 2);
+  });
 });
