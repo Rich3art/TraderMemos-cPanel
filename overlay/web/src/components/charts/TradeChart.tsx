@@ -9,12 +9,15 @@ import {
   type Time,
 } from "lightweight-charts";
 import {
+  Activity,
+  ArrowUpRight,
   ChartCandlestick,
   Maximize2,
   MousePointer2,
   MoveHorizontal,
   MoveVertical,
   Play,
+  Redo2,
   Save,
   Slash,
   Square,
@@ -45,22 +48,27 @@ import { BAR_INTERVALS, tradeChartTheme } from "./tradeChartTheme";
 /** The fill fields the chart draws — synthetic backtest fills qualify too. */
 export type ChartFill = Pick<Execution, "side" | "quantity" | "price" | "executed_at">;
 
-type DrawingTool = "select" | "trendline" | "horizontal" | "vertical" | "rectangle";
+type PointToPointDrawingType =
+  | "trendline"
+  | "rectangle"
+  | "arrow"
+  | "curved-arrow"
+  | "fib-projection";
+
+type DrawingTool = "select" | "horizontal" | "vertical" | PointToPointDrawingType;
 
 export type ChartDrawing =
-  | { id: string; type: "trendline"; from: DrawingPoint; to: DrawingPoint }
+  | { id: string; type: PointToPointDrawingType; from: DrawingPoint; to: DrawingPoint }
   | { id: string; type: "horizontal"; price: number }
-  | { id: string; type: "vertical"; time: number }
-  | { id: string; type: "rectangle"; from: DrawingPoint; to: DrawingPoint };
+  | { id: string; type: "vertical"; time: number };
 
 type DrawingPoint = { time: number; price: number };
 
-type DraftDrawing =
-  | { type: "trendline"; from: DrawingPoint; to: DrawingPoint }
-  | { type: "rectangle"; from: DrawingPoint; to: DrawingPoint };
+type DraftDrawing = { type: PointToPointDrawingType; from: DrawingPoint; to: DrawingPoint };
 
 const DRAWING_COLOR = "#38bdf8";
 const DRAWING_FILL = "rgba(56, 189, 248, 0.12)";
+const FIB_LEVELS = [0, 0.618, 1, 1.272, 1.618, 2.618] as const;
 const DRAWING_STORAGE_PREFIX = "tradermemos-chart-drawings:";
 
 export function drawingStorageKey(symbol: string, interval: BarInterval) {
@@ -77,7 +85,20 @@ export function readStoredChartDrawings(symbol: string, interval: BarInterval): 
 }
 
 function isDrawingTool(value: string): value is DrawingTool {
-  return ["select", "trendline", "horizontal", "vertical", "rectangle"].includes(value);
+  return [
+    "select",
+    "trendline",
+    "horizontal",
+    "vertical",
+    "rectangle",
+    "arrow",
+    "curved-arrow",
+    "fib-projection",
+  ].includes(value);
+}
+
+function isPointToPointDrawingType(value: string): value is PointToPointDrawingType {
+  return ["trendline", "rectangle", "arrow", "curved-arrow", "fib-projection"].includes(value);
 }
 
 function isChartDrawing(value: unknown): value is ChartDrawing {
@@ -86,8 +107,8 @@ function isChartDrawing(value: unknown): value is ChartDrawing {
   if (typeof d.id !== "string" || typeof d.type !== "string") return false;
   if (d.type === "horizontal") return typeof d.price === "number";
   if (d.type === "vertical") return typeof d.time === "number";
-  if (d.type === "trendline" || d.type === "rectangle") {
-    const maybe = d as Partial<Extract<ChartDrawing, { type: "trendline" | "rectangle" }>>;
+  if (isPointToPointDrawingType(d.type)) {
+    const maybe = d as Partial<Extract<ChartDrawing, { type: PointToPointDrawingType }>>;
     return Boolean(
       maybe.from &&
         maybe.to &&
@@ -299,6 +320,9 @@ export function TradeChart({
     return chartRef.current?.timeScale().timeToCoordinate(time as Time) ?? null;
   }
 
+  const svgId = useId().replace(/:/g, "");
+  const arrowMarkerId = `${svgId}-drawing-arrow`;
+
   function handleDrawingPointerDown(e: PointerEvent<HTMLDivElement>) {
     if (!canDraw || activeTool === "select") return;
     const point = eventToPoint(e);
@@ -397,6 +421,87 @@ export function TradeChart({
           stroke={DRAWING_COLOR}
           strokeWidth={1.5}
         />
+      );
+    }
+    if (drawing.type === "arrow") {
+      return (
+        <line
+          key={key}
+          x1={from.x}
+          y1={from.y}
+          x2={to.x}
+          y2={to.y}
+          stroke={DRAWING_COLOR}
+          strokeWidth={1.8}
+          markerEnd={`url(#${arrowMarkerId})`}
+        />
+      );
+    }
+    if (drawing.type === "curved-arrow") {
+      const dx = to.x - from.x;
+      const dy = to.y - from.y;
+      const len = Math.max(Math.hypot(dx, dy), 1);
+      const bend = Math.min(Math.max(len * 0.25, 24), 80);
+      const cx = (from.x + to.x) / 2 - (dy / len) * bend;
+      const cy = (from.y + to.y) / 2 + (dx / len) * bend;
+      return (
+        <path
+          key={key}
+          d={`M ${from.x} ${from.y} Q ${cx} ${cy} ${to.x} ${to.y}`}
+          fill="none"
+          stroke={DRAWING_COLOR}
+          strokeWidth={1.8}
+          markerEnd={`url(#${arrowMarkerId})`}
+        />
+      );
+    }
+    if (drawing.type === "fib-projection") {
+      const width = containerRef.current?.clientWidth ?? 0;
+      const projection = drawing.to.price - drawing.from.price;
+      const lineStart = Math.min(from.x, to.x);
+      const lineEnd = width > 0 ? width : "100%";
+      const labelX = width > 0 ? Math.min(Math.max(to.x + 8, 6), Math.max(width - 74, 6)) : to.x + 8;
+      return (
+        <g key={key}>
+          <line
+            x1={from.x}
+            y1={from.y}
+            x2={to.x}
+            y2={to.y}
+            stroke={DRAWING_COLOR}
+            strokeWidth={1.4}
+            strokeDasharray="4 4"
+          />
+          {FIB_LEVELS.map((level) => {
+            const price = drawing.to.price + projection * level;
+            const y = priceToY(price);
+            if (y == null) return null;
+            return (
+              <g key={level}>
+                <line
+                  x1={lineStart}
+                  x2={lineEnd}
+                  y1={y}
+                  y2={y}
+                  stroke={DRAWING_COLOR}
+                  strokeWidth={1.1}
+                  strokeOpacity={level === 0 || level === 1 ? 0.95 : 0.7}
+                />
+                <text
+                  x={labelX}
+                  y={y - 4}
+                  fill={DRAWING_COLOR}
+                  fontSize={11}
+                  paintOrder="stroke"
+                  stroke="rgba(15, 23, 42, 0.85)"
+                  strokeWidth={3}
+                >
+                  {level.toFixed(level === 0 || level === 1 ? 0 : 3)}
+                </text>
+              </g>
+            );
+          })}
+        </g>
       );
     }
     return (
@@ -602,6 +707,9 @@ export function TradeChart({
                     ["horizontal", MoveHorizontal, "Draw horizontal level"],
                     ["vertical", MoveVertical, "Draw vertical marker"],
                     ["rectangle", Square, "Draw rectangle"],
+                    ["arrow", ArrowUpRight, "Draw straight arrow"],
+                    ["curved-arrow", Redo2, "Draw curved arrow"],
+                    ["fib-projection", Activity, "Draw Fibonacci projection"],
                   ] as const
                 ).map(([tool, Icon, label]) => {
                   return (
@@ -730,6 +838,19 @@ export function TradeChart({
             onPointerCancel={() => setDraft(null)}
           >
             <svg className="h-full w-full overflow-visible">
+              <defs>
+                <marker
+                  id={arrowMarkerId}
+                  markerWidth="8"
+                  markerHeight="8"
+                  refX="7"
+                  refY="4"
+                  orient="auto"
+                  markerUnits="strokeWidth"
+                >
+                  <path d="M 0 0 L 8 4 L 0 8 z" fill={DRAWING_COLOR} />
+                </marker>
+              </defs>
               {drawings.map((d) => renderDrawing(d, d.id))}
               {draft && renderDrawing(draft, "draft")}
             </svg>
