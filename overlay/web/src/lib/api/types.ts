@@ -408,6 +408,15 @@ export interface JournalNote {
   updated_at: string;
 }
 
+export interface Feedback {
+  id: string;
+  body: string;
+  page: string;
+  status: "open" | "reviewing" | "closed" | string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ImportBatch {
   id: string;
   user_id: string;

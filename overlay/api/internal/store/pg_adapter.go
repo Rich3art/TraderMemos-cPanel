@@ -72,6 +72,14 @@ func (p *PG) CreateCoachReview(ctx context.Context, arg CreateCoachReviewParams)
 	return CoachReview(v), nil
 }
 
+func (p *PG) CreateFeedback(ctx context.Context, arg CreateFeedbackParams) (Feedback, error) {
+	v, err := p.q.CreateFeedback(ctx, storepg.CreateFeedbackParams(arg))
+	if err != nil {
+		return Feedback{}, err
+	}
+	return Feedback(v), nil
+}
+
 func (p *PG) CreateImportBatch(ctx context.Context, arg CreateImportBatchParams) (ImportBatch, error) {
 	v, err := p.q.CreateImportBatch(ctx, storepg.CreateImportBatchParams(arg))
 	if err != nil {
@@ -849,6 +857,21 @@ func (p *PG) ListExecutionsForTrade(ctx context.Context, tradeID string) ([]Exec
 		out := make([]Execution, len(in))
 		for i := range in {
 			out[i] = Execution(in[i])
+		}
+		return out
+	}(), nil
+}
+
+func (p *PG) ListFeedbackByUser(ctx context.Context, userID string) ([]Feedback, error) {
+	v, err := p.q.ListFeedbackByUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return func() []Feedback {
+		in := v
+		out := make([]Feedback, len(in))
+		for i := range in {
+			out[i] = Feedback(in[i])
 		}
 		return out
 	}(), nil

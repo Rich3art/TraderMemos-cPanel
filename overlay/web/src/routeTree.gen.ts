@@ -16,6 +16,7 @@ import { Route as ChartRouteImport } from './routes/chart'
 import { Route as ConnectRouteImport } from './routes/connect'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as EventsRouteImport } from './routes/events'
+import { Route as FeedbackRouteImport } from './routes/feedback'
 import { Route as HomeRouteImport } from './routes/home'
 import { Route as ImportRouteImport } from './routes/import'
 import { Route as LoginRouteImport } from './routes/login'
@@ -67,6 +68,11 @@ const DashboardRoute = DashboardRouteImport.update({
 const EventsRoute = EventsRouteImport.update({
   id: '/events',
   path: '/events',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FeedbackRoute = FeedbackRouteImport.update({
+  id: '/feedback',
+  path: '/feedback',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HomeRoute = HomeRouteImport.update({
@@ -163,6 +169,7 @@ export interface FileRoutesByFullPath {
   '/connect': typeof ConnectRoute
   '/dashboard': typeof DashboardRoute
   '/events': typeof EventsRoute
+  '/feedback': typeof FeedbackRoute
   '/home': typeof HomeRoute
   '/import': typeof ImportRoute
   '/login': typeof LoginRoute
@@ -189,6 +196,7 @@ export interface FileRoutesByTo {
   '/connect': typeof ConnectRoute
   '/dashboard': typeof DashboardRoute
   '/events': typeof EventsRoute
+  '/feedback': typeof FeedbackRoute
   '/home': typeof HomeRoute
   '/import': typeof ImportRoute
   '/login': typeof LoginRoute
@@ -215,6 +223,7 @@ export interface FileRoutesById {
   '/connect': typeof ConnectRoute
   '/dashboard': typeof DashboardRoute
   '/events': typeof EventsRoute
+  '/feedback': typeof FeedbackRoute
   '/home': typeof HomeRoute
   '/import': typeof ImportRoute
   '/login': typeof LoginRoute
@@ -243,6 +252,7 @@ export interface FileRouteTypes {
     | '/connect'
     | '/dashboard'
     | '/events'
+    | '/feedback'
     | '/home'
     | '/import'
     | '/login'
@@ -269,6 +279,7 @@ export interface FileRouteTypes {
     | '/connect'
     | '/dashboard'
     | '/events'
+    | '/feedback'
     | '/home'
     | '/import'
     | '/login'
@@ -294,6 +305,7 @@ export interface FileRouteTypes {
     | '/connect'
     | '/dashboard'
     | '/events'
+    | '/feedback'
     | '/home'
     | '/import'
     | '/login'
@@ -321,6 +333,7 @@ export interface RootRouteChildren {
   ConnectRoute: typeof ConnectRoute
   DashboardRoute: typeof DashboardRoute
   EventsRoute: typeof EventsRoute
+  FeedbackRoute: typeof FeedbackRoute
   HomeRoute: typeof HomeRoute
   ImportRoute: typeof ImportRoute
   LoginRoute: typeof LoginRoute
@@ -387,6 +400,13 @@ declare module '@tanstack/react-router' {
       path: '/events'
       fullPath: '/events'
       preLoaderRoute: typeof EventsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/feedback': {
+      id: '/feedback'
+      path: '/feedback'
+      fullPath: '/feedback'
+      preLoaderRoute: typeof FeedbackRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/home': {
@@ -532,6 +552,7 @@ const rootRouteChildren: RootRouteChildren = {
   ConnectRoute: ConnectRoute,
   DashboardRoute: DashboardRoute,
   EventsRoute: EventsRoute,
+  FeedbackRoute: FeedbackRoute,
   HomeRoute: HomeRoute,
   ImportRoute: ImportRoute,
   LoginRoute: LoginRoute,
