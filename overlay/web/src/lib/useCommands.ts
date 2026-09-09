@@ -63,6 +63,13 @@ const NAV_COMMANDS: Array<{
     icon: Newspaper,
     keywords: ["news", "economic calendar", "cpi", "nfp", "fomc"],
   },
+  {
+    id: "nav-news",
+    label: "News",
+    to: "/news",
+    icon: Newspaper,
+    keywords: ["forex news", "crypto news", "metals news", "market news"],
+  },
   { id: "nav-playbook", label: "Playbook", to: "/playbook", icon: BookOpen },
   {
     id: "nav-notes",

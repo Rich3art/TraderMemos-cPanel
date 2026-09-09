@@ -11,6 +11,7 @@ import (
 
 func (s *Server) economicEventRoutes(g *echo.Group) {
 	g.GET("/economic-events", s.handleListEconomicEvents)
+	g.GET("/news", s.handleListNews)
 }
 
 type economicEventDTO struct {
