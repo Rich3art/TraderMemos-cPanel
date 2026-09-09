@@ -320,6 +320,22 @@ func (p *PG) GetCoachSettings(ctx context.Context) (CoachSetting, error) {
 	return CoachSetting(v), nil
 }
 
+func (p *PG) GetCommercialFeedSettings(ctx context.Context) (CommercialFeedSetting, error) {
+	v, err := p.q.GetCommercialFeedSettings(ctx)
+	if err != nil {
+		return CommercialFeedSetting{}, err
+	}
+	return CommercialFeedSetting{
+		ID:           int64(v.ID),
+		NewsProvider: v.NewsProvider,
+		PaidProvider: v.PaidProvider,
+		ApiBaseUrl:   v.ApiBaseUrl,
+		ApiKey:       v.ApiKey,
+		LicenseNote:  v.LicenseNote,
+		UpdatedAt:    v.UpdatedAt,
+	}, nil
+}
+
 func (p *PG) GetEconomicCalendarAISettings(ctx context.Context) (EconomicCalendarAISetting, error) {
 	v, err := p.q.GetEconomicCalendarAISettings(ctx)
 	if err != nil {
@@ -1333,6 +1349,28 @@ func (p *PG) UpsertEconomicCalendarAISettings(ctx context.Context, arg UpsertEco
 		ApiKey:       v.ApiKey,
 		Model:        v.Model,
 		CustomPrompt: v.CustomPrompt,
+		UpdatedAt:    v.UpdatedAt,
+	}, nil
+}
+
+func (p *PG) UpsertCommercialFeedSettings(ctx context.Context, arg UpsertCommercialFeedSettingsParams) (CommercialFeedSetting, error) {
+	v, err := p.q.UpsertCommercialFeedSettings(ctx, storepg.UpsertCommercialFeedSettingsParams{
+		NewsProvider: arg.NewsProvider,
+		PaidProvider: arg.PaidProvider,
+		ApiBaseUrl:   arg.ApiBaseUrl,
+		ApiKey:       arg.ApiKey,
+		LicenseNote:  arg.LicenseNote,
+	})
+	if err != nil {
+		return CommercialFeedSetting{}, err
+	}
+	return CommercialFeedSetting{
+		ID:           int64(v.ID),
+		NewsProvider: v.NewsProvider,
+		PaidProvider: v.PaidProvider,
+		ApiBaseUrl:   v.ApiBaseUrl,
+		ApiKey:       v.ApiKey,
+		LicenseNote:  v.LicenseNote,
 		UpdatedAt:    v.UpdatedAt,
 	}, nil
 }

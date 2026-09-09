@@ -43,6 +43,26 @@ export interface PsychologyQuestions {
   questions: string[];
 }
 
+export type CommercialNewsProvider = "public" | "paid";
+export type CommercialPaidProvider = "" | "newsapi" | "finnhub" | "mediastack" | "custom";
+
+export interface CommercialFeedSettings {
+  news_provider: CommercialNewsProvider;
+  paid_provider: CommercialPaidProvider;
+  api_base_url: string;
+  license_note: string;
+  api_key_set: boolean;
+  api_key_hint?: string;
+}
+
+export interface CommercialFeedSettingsPut {
+  news_provider: CommercialNewsProvider;
+  paid_provider: CommercialPaidProvider;
+  api_base_url: string;
+  license_note: string;
+  api_key?: string;
+}
+
 export const settingsApi = {
   getRiskRules: () => apiFetch<RiskRules>("/settings/risk-rules"),
   putRiskRules: (body: RiskRules) =>
@@ -124,6 +144,13 @@ export const settingsApi = {
   listEconomicCalendarAIModels: (body: LlmApiModelsRequest = {}) =>
     apiFetch<LlmApiModelsResult>("/settings/economic-calendar-ai/models", {
       method: "POST",
+      body: JSON.stringify(body),
+    }),
+  getCommercialFeedSettings: () =>
+    apiFetch<CommercialFeedSettings>("/settings/commercial-feed"),
+  putCommercialFeedSettings: (body: CommercialFeedSettingsPut) =>
+    apiFetch<CommercialFeedSettings>("/settings/commercial-feed", {
+      method: "PUT",
       body: JSON.stringify(body),
     }),
 };

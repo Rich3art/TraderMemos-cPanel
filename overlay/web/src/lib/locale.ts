@@ -135,6 +135,7 @@ export type SettingsSectionId =
   | "general"
   | "shortcuts"
   | "api"
+  | "commercial-feed"
   | "sharing"
   | "about";
 
@@ -153,6 +154,7 @@ export type SettingsLabelKey =
   | "general"
   | "shortcuts"
   | "api"
+  | "commercial-feed"
   | "about"
   | "accountsTitle"
   | "accountsDescription"
@@ -166,6 +168,8 @@ export type SettingsLabelKey =
   | "generalDescription"
   | "apiTitle"
   | "apiDescription"
+  | "commercial-feedTitle"
+  | "commercial-feedDescription"
   | "sharing"
   | "sharingTitle"
   | "sharingDescription"
@@ -317,11 +321,12 @@ const SETTINGS_LABELS: Record<AppLocale, Record<SettingsLabelKey, string>> = {
     accounts: "Accounts",
     rules: "Rules",
     journal: "Journal",
-    ai: "AI",
-    general: "General",
-    shortcuts: "Shortcuts",
-    api: "API",
-    about: "About",
+      ai: "AI",
+      general: "General",
+      shortcuts: "Shortcuts",
+      api: "API",
+      "commercial-feed": "Commercial Feed",
+      about: "About",
     accountsTitle: "Accounts & funding",
     accountsDescription: "Manage broker accounts, starting balances, and cash flows.",
     rulesTitle: "Rules & checklist",
@@ -342,6 +347,9 @@ const SETTINGS_LABELS: Record<AppLocale, Record<SettingsLabelKey, string>> = {
     generalDescription: "Preferences and session.",
     apiTitle: "API access",
     apiDescription: "Personal access tokens and OpenAPI docs for external tools, MCP, and scripts.",
+    "commercial-feedTitle": "Commercial Feed",
+    "commercial-feedDescription":
+      "Choose the News feed source and prepare paid commercial feed credentials for later integration.",
     sharing: "Sharing",
     sharingTitle: "Sharing",
     sharingDescription: "Public share links for a read-only performance summary.",
@@ -513,6 +521,7 @@ const SETTINGS_LABELS: Record<AppLocale, Record<SettingsLabelKey, string>> = {
     general: "一般",
     shortcuts: "快捷鍵",
     api: "API",
+    "commercial-feed": "Commercial Feed",
     about: "關於",
     accountsTitle: "帳戶與資金",
     accountsDescription: "管理券商帳戶、起始結餘及現金流。",
@@ -534,6 +543,9 @@ const SETTINGS_LABELS: Record<AppLocale, Record<SettingsLabelKey, string>> = {
     generalDescription: "偏好設定及工作階段。",
     apiTitle: "API 存取",
     apiDescription: "個人存取權杖與 OpenAPI 文件，供外部工具、MCP 及腳本使用。",
+    "commercial-feedTitle": "Commercial Feed",
+    "commercial-feedDescription":
+      "Choose the News feed source and prepare paid commercial feed credentials for later integration.",
     sharing: "分享",
     sharingTitle: "分享",
     sharingDescription: "以唯讀方式公開分享績效摘要嘅連結。",
@@ -695,6 +707,7 @@ const SETTINGS_LABELS: Record<AppLocale, Record<SettingsLabelKey, string>> = {
     general: "一般",
     shortcuts: "ショートカット",
     api: "API",
+    "commercial-feed": "Commercial Feed",
     about: "について",
     accountsTitle: "アカウントと資金",
     accountsDescription: "証券会社アカウント、開始残高、キャッシュフローを管理します。",
@@ -717,6 +730,9 @@ const SETTINGS_LABELS: Record<AppLocale, Record<SettingsLabelKey, string>> = {
     apiTitle: "API アクセス",
     apiDescription:
       "外部ツール、MCP、スクリプト向けの個人アクセストークンと OpenAPI ドキュメント。",
+    "commercial-feedTitle": "Commercial Feed",
+    "commercial-feedDescription":
+      "Choose the News feed source and prepare paid commercial feed credentials for later integration.",
     sharing: "共有",
     sharingTitle: "共有",
     sharingDescription: "読み取り専用のパフォーマンス概要を公開する共有リンク。",
@@ -886,6 +902,7 @@ const SETTINGS_LABELS: Record<AppLocale, Record<SettingsLabelKey, string>> = {
     general: "일반",
     shortcuts: "단축키",
     api: "API",
+    "commercial-feed": "Commercial Feed",
     about: "정보",
     accountsTitle: "계정 및 자금",
     accountsDescription: "브로커 계정, 시작 잔액, 현금 흐름을 관리합니다.",
@@ -907,6 +924,9 @@ const SETTINGS_LABELS: Record<AppLocale, Record<SettingsLabelKey, string>> = {
     generalDescription: "환경설정 및 세션.",
     apiTitle: "API 접근",
     apiDescription: "외부 도구, MCP, 스크립트용 개인 액세스 토큰과 OpenAPI 문서.",
+    "commercial-feedTitle": "Commercial Feed",
+    "commercial-feedDescription":
+      "Choose the News feed source and prepare paid commercial feed credentials for later integration.",
     sharing: "공유",
     sharingTitle: "공유",
     sharingDescription: "읽기 전용 성과 요약을 공개하는 공유 링크.",
@@ -1099,6 +1119,7 @@ export function settingsNavItems(locale: string): {
       { id: "journal", key: "journal" },
       { id: "ai", key: "ai" },
       { id: "api", key: "api" },
+      { id: "commercial-feed", key: "commercial-feed" },
       { id: "sharing", key: "sharing" },
       { id: "about", key: "about" },
     ] as const

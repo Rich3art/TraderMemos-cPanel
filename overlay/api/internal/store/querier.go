@@ -60,6 +60,7 @@ type Querier interface {
 	GetChartAnnotation(ctx context.Context, arg GetChartAnnotationParams) (ChartAnnotation, error)
 	GetChecklistTemplate(ctx context.Context, userID string) (ChecklistTemplate, error)
 	GetCoachSettings(ctx context.Context) (CoachSetting, error)
+	GetCommercialFeedSettings(ctx context.Context) (CommercialFeedSetting, error)
 	GetEconomicCalendarAISettings(ctx context.Context) (EconomicCalendarAISetting, error)
 	GetEconomicEventsLastFetch(ctx context.Context, provider string) (string, error)
 	GetExecution(ctx context.Context, arg GetExecutionParams) (Execution, error)
@@ -165,6 +166,7 @@ type Querier interface {
 	UpsertChartAnnotation(ctx context.Context, arg UpsertChartAnnotationParams) (ChartAnnotation, error)
 	UpsertChecklistTemplate(ctx context.Context, arg UpsertChecklistTemplateParams) (ChecklistTemplate, error)
 	UpsertCoachSettings(ctx context.Context, arg UpsertCoachSettingsParams) (CoachSetting, error)
+	UpsertCommercialFeedSettings(ctx context.Context, arg UpsertCommercialFeedSettingsParams) (CommercialFeedSetting, error)
 	UpsertEconomicCalendarAISettings(ctx context.Context, arg UpsertEconomicCalendarAISettingsParams) (EconomicCalendarAISetting, error)
 	UpsertEconomicEvent(ctx context.Context, arg UpsertEconomicEventParams) error
 	UpsertFlexSyncSettings(ctx context.Context, arg UpsertFlexSyncSettingsParams) (FlexSyncSetting, error)
