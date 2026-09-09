@@ -5,6 +5,7 @@ import type { EconomicEvent } from "@/lib/api/economicEvents";
 import {
   addDaysKey,
   EconomicEventsView,
+  economicEventSector,
   formatWeekLabel,
   weekStartKey,
 } from "./EconomicEventsView";
@@ -32,6 +33,7 @@ const baseProps = {
   onPrevWeek: vi.fn<() => void>(),
   onNextWeek: vi.fn<() => void>(),
   onThisWeek: vi.fn<() => void>(),
+  onSectorChange: vi.fn<(next?: string) => void>(),
   onImpactChange: vi.fn<(next?: string[]) => void>(),
   onCurrenciesChange: vi.fn<(next?: string[]) => void>(),
 };
@@ -82,6 +84,21 @@ describe("EconomicEventsView", () => {
     expect(screen.getByText("No events match the filters")).toBeInTheDocument();
   });
 
+  it("filters by calendar sector", () => {
+    render(
+      <EconomicEventsView
+        {...baseProps}
+        sector="energy"
+        events={[
+          ev({ id: 1, title: "CPI y/y" }),
+          ev({ id: 2, title: "Crude Oil Inventories", country: "USD" }),
+        ]}
+      />,
+    );
+    expect(screen.getByText("Crude Oil Inventories")).toBeInTheDocument();
+    expect(screen.queryByText("CPI y/y")).not.toBeInTheDocument();
+  });
+
   it("shows an error state when the query fails", () => {
     render(<EconomicEventsView {...baseProps} error events={[]} />);
     expect(screen.getByText("Couldn't load events")).toBeInTheDocument();
@@ -106,6 +123,15 @@ describe("EconomicEventsView", () => {
       "href",
       "https://www.bls.gov/schedule/news_release/",
     );
+  });
+});
+
+describe("economicEventSector", () => {
+  it("classifies sector-specific events and defaults macro currency events to forex", () => {
+    expect(economicEventSector(ev({ title: "Crude Oil Inventories" }))).toBe("energy");
+    expect(economicEventSector(ev({ title: "Bitcoin ETF Flow" }))).toBe("crypto");
+    expect(economicEventSector(ev({ title: "Gold Reserves" }))).toBe("metals");
+    expect(economicEventSector(ev({ title: "Non-Farm Employment Change" }))).toBe("forex");
   });
 });
 

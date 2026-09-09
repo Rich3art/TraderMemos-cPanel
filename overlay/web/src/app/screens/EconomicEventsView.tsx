@@ -24,6 +24,24 @@ import { fmtTime } from "@/lib/format";
 import { intlLocale } from "@/lib/locale";
 
 export const IMPACT_VALUES: EconomicImpact[] = ["high", "medium", "low", "holiday"];
+export const CALENDAR_SECTORS = ["forex", "energy", "crypto", "metals"] as const;
+export type EconomicCalendarSector = (typeof CALENDAR_SECTORS)[number];
+
+const SECTOR_META: Record<EconomicCalendarSector, { label: string; keywords: string[] }> = {
+  forex: { label: "Forex", keywords: [] },
+  energy: {
+    label: "Energy",
+    keywords: ["crude", "oil", "gasoline", "natural gas", "nat gas", "eia", "opec", "petroleum"],
+  },
+  crypto: {
+    label: "Crypto",
+    keywords: ["bitcoin", "btc", "ethereum", "eth", "crypto", "blockchain", "stablecoin"],
+  },
+  metals: {
+    label: "Metals",
+    keywords: ["gold", "silver", "copper", "xau", "xag", "metal", "metals"],
+  },
+};
 
 const IMPACT_META: Record<
   EconomicImpact,
@@ -116,6 +134,16 @@ function providerUrl(provider: string): string {
   return "https://www.bls.gov/schedule/news_release/";
 }
 
+export function economicEventSector(ev: EconomicEvent): EconomicCalendarSector {
+  const haystack = `${ev.title} ${ev.country} ${ev.provider}`.toLowerCase();
+  for (const sector of ["energy", "crypto", "metals"] as const) {
+    if (SECTOR_META[sector].keywords.some((keyword) => haystack.includes(keyword))) {
+      return sector;
+    }
+  }
+  return "forex";
+}
+
 function parseNumericFigure(value: string): number | null {
   const cleaned = value.replace(/,/g, "").match(/-?\d+(?:\.\d+)?/);
   if (!cleaned) return null;
@@ -191,6 +219,8 @@ export interface EconomicEventsViewProps {
   onThisWeek: () => void;
   impact?: string[];
   onImpactChange: (next?: string[]) => void;
+  sector?: EconomicCalendarSector;
+  onSectorChange: (next?: EconomicCalendarSector) => void;
   currencies?: string[];
   onCurrenciesChange: (next?: string[]) => void;
 }
@@ -206,6 +236,8 @@ export function EconomicEventsView({
   onThisWeek,
   impact,
   onImpactChange,
+  sector,
+  onSectorChange,
   currencies,
   onCurrenciesChange,
 }: EconomicEventsViewProps) {
@@ -227,7 +259,9 @@ export function EconomicEventsView({
   const currencySet = currencies?.length ? new Set(currencies) : null;
   const filtered = events.filter(
     (ev) =>
-      (!impactSet || impactSet.has(ev.impact)) && (!currencySet || currencySet.has(ev.country)),
+      (!sector || economicEventSector(ev) === sector) &&
+      (!impactSet || impactSet.has(ev.impact)) &&
+      (!currencySet || currencySet.has(ev.country)),
   );
 
   const byDay = useMemo(() => {
@@ -242,7 +276,7 @@ export function EconomicEventsView({
   }, [filtered, timeZone]);
 
   const hasActual = filtered.some((ev) => ev.actual !== "");
-  const filtersActive = impactSet != null || currencySet != null;
+  const filtersActive = sector != null || impactSet != null || currencySet != null;
   const label = formatWeekLabel(weekStart, locale, todayKey);
   const rowGrid = cn(
     ROW_GRID_BASE,
@@ -401,6 +435,23 @@ export function EconomicEventsView({
           </Button>
         ) : null}
         <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
+          <FacetedFilter
+            title="Calendar sector"
+            options={CALENDAR_SECTORS.map((value) => ({
+              value,
+              label: SECTOR_META[value].label,
+              count: events.filter((ev) => economicEventSector(ev) === value).length,
+            }))}
+            value={sector}
+            onChange={(next) =>
+              onSectorChange(
+                typeof next === "string" && CALENDAR_SECTORS.includes(next as EconomicCalendarSector)
+                  ? (next as EconomicCalendarSector)
+                  : undefined,
+              )
+            }
+            className="px-2 sm:px-3"
+          />
           <FacetedFilter
             title="Impact"
             multiple
