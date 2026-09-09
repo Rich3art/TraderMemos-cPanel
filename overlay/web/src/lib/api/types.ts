@@ -417,6 +417,22 @@ export interface Feedback {
   updated_at: string;
 }
 
+export interface GetFundedListing {
+  id: string;
+  firm_name: string;
+  heading: string;
+  description: string;
+  content: string;
+  image_url: string;
+  affiliate_url: string;
+  cta_label: string;
+  promo_code: string;
+  display_order: number;
+  published: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ImportBatch {
   id: string;
   user_id: string;

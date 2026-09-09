@@ -7,6 +7,7 @@ import {
   List,
   MessageSquare,
   Newspaper,
+  BadgeDollarSign,
   PieChart,
   StickyNote,
   Upload,
@@ -57,6 +58,7 @@ export const PRIMARY_NAV: NavItem[] = [
 export const SECONDARY_NAV: NavItem[] = [
   { to: "/events", labelKey: "events", icon: Newspaper },
   { to: "/news", labelKey: "news", icon: Newspaper },
+  { to: "/get-funded", labelKey: "getFunded", icon: BadgeDollarSign },
   { to: "/notes", labelKey: "notes", icon: StickyNote },
   { to: "/feedback", labelKey: "feedback", icon: MessageSquare },
   { to: "/playbook", labelKey: "playbook", icon: BookOpen },

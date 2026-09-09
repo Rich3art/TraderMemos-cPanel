@@ -80,6 +80,14 @@ func (p *PG) CreateFeedback(ctx context.Context, arg CreateFeedbackParams) (Feed
 	return Feedback(v), nil
 }
 
+func (p *PG) CreateGetFundedListing(ctx context.Context, arg CreateGetFundedListingParams) (GetFundedListing, error) {
+	v, err := p.q.CreateGetFundedListing(ctx, storepg.CreateGetFundedListingParams(arg))
+	if err != nil {
+		return GetFundedListing{}, err
+	}
+	return GetFundedListing(v), nil
+}
+
 func (p *PG) CreateImportBatch(ctx context.Context, arg CreateImportBatchParams) (ImportBatch, error) {
 	v, err := p.q.CreateImportBatch(ctx, storepg.CreateImportBatchParams(arg))
 	if err != nil {
@@ -182,6 +190,10 @@ func (p *PG) DeleteFlexSyncSettings(ctx context.Context, arg DeleteFlexSyncSetti
 
 func (p *PG) DeleteFutureEconomicEvents(ctx context.Context, arg DeleteFutureEconomicEventsParams) error {
 	return p.q.DeleteFutureEconomicEvents(ctx, storepg.DeleteFutureEconomicEventsParams(arg))
+}
+
+func (p *PG) DeleteGetFundedListing(ctx context.Context, id string) (int64, error) {
+	return p.q.DeleteGetFundedListing(ctx, id)
 }
 
 func (p *PG) DeleteJournalNote(ctx context.Context, arg DeleteJournalNoteParams) (int64, error) {
@@ -877,6 +889,30 @@ func (p *PG) ListFeedbackByUser(ctx context.Context, userID string) ([]Feedback,
 	}(), nil
 }
 
+func (p *PG) ListAllGetFundedListings(ctx context.Context) ([]GetFundedListing, error) {
+	v, err := p.q.ListAllGetFundedListings(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]GetFundedListing, len(v))
+	for i := range v {
+		out[i] = GetFundedListing(v[i])
+	}
+	return out, nil
+}
+
+func (p *PG) ListPublishedGetFundedListings(ctx context.Context) ([]GetFundedListing, error) {
+	v, err := p.q.ListPublishedGetFundedListings(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]GetFundedListing, len(v))
+	for i := range v {
+		out[i] = GetFundedListing(v[i])
+	}
+	return out, nil
+}
+
 func (p *PG) ListFlexSyncSettingsForUser(ctx context.Context, userID string) ([]ListFlexSyncSettingsForUserRow, error) {
 	v, err := p.q.ListFlexSyncSettingsForUser(ctx, userID)
 	if err != nil {
@@ -1260,6 +1296,14 @@ func (p *PG) UpdateExecutionContract(ctx context.Context, arg UpdateExecutionCon
 
 func (p *PG) UpdateFlexSyncStatus(ctx context.Context, arg UpdateFlexSyncStatusParams) error {
 	return p.q.UpdateFlexSyncStatus(ctx, storepg.UpdateFlexSyncStatusParams(arg))
+}
+
+func (p *PG) UpdateGetFundedListing(ctx context.Context, arg UpdateGetFundedListingParams) (GetFundedListing, error) {
+	v, err := p.q.UpdateGetFundedListing(ctx, storepg.UpdateGetFundedListingParams(arg))
+	if err != nil {
+		return GetFundedListing{}, err
+	}
+	return GetFundedListing(v), nil
 }
 
 func (p *PG) UpdateJournalNote(ctx context.Context, arg UpdateJournalNoteParams) (JournalNote, error) {

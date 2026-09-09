@@ -18,6 +18,7 @@ type Querier interface {
 	CreateAccount(ctx context.Context, arg CreateAccountParams) (Account, error)
 	CreateCoachReview(ctx context.Context, arg CreateCoachReviewParams) (CoachReview, error)
 	CreateFeedback(ctx context.Context, arg CreateFeedbackParams) (Feedback, error)
+	CreateGetFundedListing(ctx context.Context, arg CreateGetFundedListingParams) (GetFundedListing, error)
 	CreateImportBatch(ctx context.Context, arg CreateImportBatchParams) (ImportBatch, error)
 	CreateJournalNote(ctx context.Context, arg CreateJournalNoteParams) (JournalNote, error)
 	CreateSetup(ctx context.Context, arg CreateSetupParams) (Setup, error)
@@ -38,6 +39,7 @@ type Querier interface {
 	DeleteExecutionsForTrade(ctx context.Context, arg DeleteExecutionsForTradeParams) error
 	DeleteFlexSyncSettings(ctx context.Context, arg DeleteFlexSyncSettingsParams) (int64, error)
 	DeleteFutureEconomicEvents(ctx context.Context, arg DeleteFutureEconomicEventsParams) error
+	DeleteGetFundedListing(ctx context.Context, id string) (int64, error)
 	DeleteJournalNote(ctx context.Context, arg DeleteJournalNoteParams) (int64, error)
 	DeleteMediaFile(ctx context.Context, arg DeleteMediaFileParams) (int64, error)
 	DeletePropSettings(ctx context.Context, arg DeletePropSettingsParams) error
@@ -114,6 +116,8 @@ type Querier interface {
 	ListExecutionsForTrade(ctx context.Context, tradeID string) ([]Execution, error)
 	ListFeedbackByUser(ctx context.Context, userID string) ([]Feedback, error)
 	ListFlexSyncSettingsForUser(ctx context.Context, userID string) ([]ListFlexSyncSettingsForUserRow, error)
+	ListAllGetFundedListings(ctx context.Context) ([]GetFundedListing, error)
+	ListPublishedGetFundedListings(ctx context.Context) ([]GetFundedListing, error)
 	ListImportBatches(ctx context.Context, userID string) ([]ImportBatch, error)
 	ListJournalNotes(ctx context.Context, arg ListJournalNotesParams) ([]JournalNote, error)
 	ListJournalRisks(ctx context.Context, userID string) ([]ListJournalRisksRow, error)
@@ -156,6 +160,7 @@ type Querier interface {
 	UpdateExecutionDetails(ctx context.Context, arg UpdateExecutionDetailsParams) (int64, error)
 	UpdateExecutionContract(ctx context.Context, arg UpdateExecutionContractParams) error
 	UpdateFlexSyncStatus(ctx context.Context, arg UpdateFlexSyncStatusParams) error
+	UpdateGetFundedListing(ctx context.Context, arg UpdateGetFundedListingParams) (GetFundedListing, error)
 	UpdateJournalNote(ctx context.Context, arg UpdateJournalNoteParams) (JournalNote, error)
 	UpdateSetup(ctx context.Context, arg UpdateSetupParams) error
 	UpdateTag(ctx context.Context, arg UpdateTagParams) (int64, error)

@@ -29,6 +29,7 @@ type NavLabelKey =
   | "reports"
   | "events"
   | "news"
+  | "getFunded"
   | "notes"
   | "feedback"
   | "playbook"
@@ -50,6 +51,7 @@ const NAV_LABELS: Record<AppLocale, Record<NavLabelKey, string>> = {
     reports: "Reports",
     events: "Events",
     news: "News",
+    getFunded: "Get Funded",
     notes: "Notes",
     feedback: "Feedback",
     playbook: "Playbook",
@@ -70,6 +72,7 @@ const NAV_LABELS: Record<AppLocale, Record<NavLabelKey, string>> = {
     reports: "報表",
     events: "財經事件",
     news: "新聞",
+    getFunded: "資金帳戶",
     notes: "筆記",
     feedback: "意見回饋",
     playbook: "策略庫",
@@ -90,6 +93,7 @@ const NAV_LABELS: Record<AppLocale, Record<NavLabelKey, string>> = {
     reports: "レポート",
     events: "経済イベント",
     news: "ニュース",
+    getFunded: "資金調達",
     notes: "メモ",
     feedback: "フィードバック",
     playbook: "プレイブック",
@@ -110,6 +114,7 @@ const NAV_LABELS: Record<AppLocale, Record<NavLabelKey, string>> = {
     reports: "리포트",
     events: "경제 이벤트",
     news: "뉴스",
+    getFunded: "펀딩",
     notes: "메모",
     feedback: "피드백",
     playbook: "플레이북",

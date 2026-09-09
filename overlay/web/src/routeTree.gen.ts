@@ -17,6 +17,7 @@ import { Route as ConnectRouteImport } from './routes/connect'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as EventsRouteImport } from './routes/events'
 import { Route as FeedbackRouteImport } from './routes/feedback'
+import { Route as GetFundedRouteImport } from './routes/get-funded'
 import { Route as HomeRouteImport } from './routes/home'
 import { Route as ImportRouteImport } from './routes/import'
 import { Route as LoginRouteImport } from './routes/login'
@@ -73,6 +74,11 @@ const EventsRoute = EventsRouteImport.update({
 const FeedbackRoute = FeedbackRouteImport.update({
   id: '/feedback',
   path: '/feedback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GetFundedRoute = GetFundedRouteImport.update({
+  id: '/get-funded',
+  path: '/get-funded',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HomeRoute = HomeRouteImport.update({
@@ -170,6 +176,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRoute
   '/events': typeof EventsRoute
   '/feedback': typeof FeedbackRoute
+  '/get-funded': typeof GetFundedRoute
   '/home': typeof HomeRoute
   '/import': typeof ImportRoute
   '/login': typeof LoginRoute
@@ -197,6 +204,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardRoute
   '/events': typeof EventsRoute
   '/feedback': typeof FeedbackRoute
+  '/get-funded': typeof GetFundedRoute
   '/home': typeof HomeRoute
   '/import': typeof ImportRoute
   '/login': typeof LoginRoute
@@ -224,6 +232,7 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRoute
   '/events': typeof EventsRoute
   '/feedback': typeof FeedbackRoute
+  '/get-funded': typeof GetFundedRoute
   '/home': typeof HomeRoute
   '/import': typeof ImportRoute
   '/login': typeof LoginRoute
@@ -253,6 +262,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/events'
     | '/feedback'
+    | '/get-funded'
     | '/home'
     | '/import'
     | '/login'
@@ -280,6 +290,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/events'
     | '/feedback'
+    | '/get-funded'
     | '/home'
     | '/import'
     | '/login'
@@ -306,6 +317,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/events'
     | '/feedback'
+    | '/get-funded'
     | '/home'
     | '/import'
     | '/login'
@@ -334,6 +346,7 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRoute
   EventsRoute: typeof EventsRoute
   FeedbackRoute: typeof FeedbackRoute
+  GetFundedRoute: typeof GetFundedRoute
   HomeRoute: typeof HomeRoute
   ImportRoute: typeof ImportRoute
   LoginRoute: typeof LoginRoute
@@ -407,6 +420,13 @@ declare module '@tanstack/react-router' {
       path: '/feedback'
       fullPath: '/feedback'
       preLoaderRoute: typeof FeedbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/get-funded': {
+      id: '/get-funded'
+      path: '/get-funded'
+      fullPath: '/get-funded'
+      preLoaderRoute: typeof GetFundedRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/home': {
@@ -553,6 +573,7 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRoute,
   EventsRoute: EventsRoute,
   FeedbackRoute: FeedbackRoute,
+  GetFundedRoute: GetFundedRoute,
   HomeRoute: HomeRoute,
   ImportRoute: ImportRoute,
   LoginRoute: LoginRoute,

@@ -156,6 +156,22 @@ type Feedback struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+type GetFundedListing struct {
+	ID           string    `json:"id"`
+	FirmName     string    `json:"firm_name"`
+	Heading      string    `json:"heading"`
+	Description  string    `json:"description"`
+	Content      string    `json:"content"`
+	ImageUrl     string    `json:"image_url"`
+	AffiliateUrl string    `json:"affiliate_url"`
+	CtaLabel     string    `json:"cta_label"`
+	PromoCode    string    `json:"promo_code"`
+	DisplayOrder int64     `json:"display_order"`
+	Published    int64     `json:"published"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
 type Execution struct {
 	ID             string         `json:"id"`
 	UserID         string         `json:"user_id"`
