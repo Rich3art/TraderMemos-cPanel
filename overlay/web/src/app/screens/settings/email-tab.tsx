@@ -1,4 +1,4 @@
-import { Mail, Send, ShieldCheck, TextCursorInput } from "lucide-react";
+import { CalendarClock, Mail, Send, ShieldCheck, TextCursorInput } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { FormInput, FormTextarea, PasswordInput } from "@/components/FormInput";
 import { FormSkeleton } from "@/components/skeletons/form-skeleton";
@@ -6,8 +6,10 @@ import { Button } from "@/components/ui/button";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import type { EmailTemplate, SmtpEncryption } from "@/lib/api/settings";
 import {
+  useAnalyticsEmailSettings,
   useEmailTemplates,
   useSaveEmailTemplate,
+  useSaveAnalyticsEmailSettings,
   useSaveSmtpSettings,
   useSmtpSettings,
   useTestSmtpSettings,
@@ -26,12 +28,29 @@ const ENCRYPTION_OPTIONS: { value: SmtpEncryption; label: string }[] = [
   { value: "none", label: "None" },
 ];
 
+const ANALYTICS_METRICS = [
+  { key: "net_pnl", label: "Net P&L" },
+  { key: "total_trades", label: "Trades" },
+  { key: "win_rate", label: "Win rate" },
+  { key: "profit_factor", label: "Profit factor" },
+  { key: "avg_trade", label: "Average trade" },
+  { key: "avg_win", label: "Average win" },
+  { key: "avg_loss", label: "Average loss" },
+  { key: "largest_win", label: "Largest win" },
+  { key: "largest_loss", label: "Largest loss" },
+  { key: "expectancy", label: "Expectancy" },
+  { key: "total_fees", label: "Total fees" },
+  { key: "max_drawdown", label: "Maximum drawdown" },
+] as const;
+
 export function EmailTab() {
   const smtp = useSmtpSettings();
   const templates = useEmailTemplates();
+  const analyticsEmail = useAnalyticsEmailSettings();
   const saveSmtp = useSaveSmtpSettings();
   const testSmtp = useTestSmtpSettings();
   const saveTemplate = useSaveEmailTemplate();
+  const saveAnalyticsEmail = useSaveAnalyticsEmailSettings();
 
   const [enabled, setEnabled] = useState(false);
   const [host, setHost] = useState("");
@@ -45,6 +64,15 @@ export function EmailTab() {
   const [toEmail, setToEmail] = useState("");
   const [smtpError, setSmtpError] = useState("");
   const [smtpMessage, setSmtpMessage] = useState("");
+  const [analyticsEnabled, setAnalyticsEnabled] = useState(false);
+  const [analyticsEmailTo, setAnalyticsEmailTo] = useState("");
+  const [analyticsTimezone, setAnalyticsTimezone] = useState("UTC");
+  const [analyticsDaily, setAnalyticsDaily] = useState(false);
+  const [analyticsWeekly, setAnalyticsWeekly] = useState(false);
+  const [analyticsMonthly, setAnalyticsMonthly] = useState(false);
+  const [analyticsMetrics, setAnalyticsMetrics] = useState<string[]>([]);
+  const [analyticsError, setAnalyticsError] = useState("");
+  const [analyticsMessage, setAnalyticsMessage] = useState("");
 
   const [selectedTemplateKey, setSelectedTemplateKey] = useState("");
   const [templateName, setTemplateName] = useState("");
@@ -64,6 +92,17 @@ export function EmailTab() {
     setPassword("");
     setClearPassword(false);
   }, [smtp.data]);
+
+  useEffect(() => {
+    if (!analyticsEmail.data) return;
+    setAnalyticsEnabled(Boolean(analyticsEmail.data.enabled));
+    setAnalyticsEmailTo(analyticsEmail.data.email || "");
+    setAnalyticsTimezone(analyticsEmail.data.timezone || "UTC");
+    setAnalyticsDaily(Boolean(analyticsEmail.data.daily));
+    setAnalyticsWeekly(Boolean(analyticsEmail.data.weekly));
+    setAnalyticsMonthly(Boolean(analyticsEmail.data.monthly));
+    setAnalyticsMetrics(analyticsEmail.data.metrics?.length ? analyticsEmail.data.metrics : ["net_pnl", "total_trades", "win_rate", "profit_factor", "avg_trade", "max_drawdown"]);
+  }, [analyticsEmail.data]);
 
   useEffect(() => {
     if (!templates.data?.length) return;
@@ -127,6 +166,31 @@ export function EmailTab() {
     } catch (err) {
       setTemplateError(err instanceof Error ? err.message : "Could not save email template.");
     }
+  }
+
+  async function handleSaveAnalyticsEmail() {
+    setAnalyticsError("");
+    setAnalyticsMessage("");
+    try {
+      await saveAnalyticsEmail.mutateAsync({
+        enabled: analyticsEnabled,
+        email: analyticsEmailTo,
+        timezone: analyticsTimezone,
+        daily: analyticsDaily,
+        weekly: analyticsWeekly,
+        monthly: analyticsMonthly,
+        metrics: analyticsMetrics,
+      });
+      setAnalyticsMessage("Analytics email schedule saved.");
+    } catch (err) {
+      setAnalyticsError(err instanceof Error ? err.message : "Could not save analytics email schedule.");
+    }
+  }
+
+  function toggleAnalyticsMetric(key: string) {
+    setAnalyticsMetrics((prev) =>
+      prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key],
+    );
   }
 
   return (
@@ -272,6 +336,95 @@ export function EmailTab() {
           {smtpMessage ? <SettingsCardNote>{smtpMessage}</SettingsCardNote> : null}
         </SettingsCard>
       )}
+
+      <SettingsCard
+        title="Scheduled analytics reports"
+        description="Send automated daily, weekly, and monthly analytics summaries using the Analytics report email template."
+      >
+        {analyticsEmail.isPending && !analyticsEmail.data ? (
+          <FormSkeleton fields={4} />
+        ) : analyticsEmail.isError || !analyticsEmail.data ? (
+          <SettingsCardNote tone="destructive">
+            Failed to load analytics email settings.
+          </SettingsCardNote>
+        ) : (
+          <>
+            <SettingsCardRow
+              icon={CalendarClock}
+              active={analyticsEnabled}
+              label="Analytics emails"
+              detail="Reports are sent by the API server background job after a period is complete."
+            >
+              <SettingsToggle checked={analyticsEnabled} onCheckedChange={setAnalyticsEnabled} />
+            </SettingsCardRow>
+            <div className="grid gap-3 px-5 py-3 md:grid-cols-2">
+              <label className="block text-[12px] font-medium text-foreground">
+                Send to
+                <FormInput
+                  className="mt-1"
+                  value={analyticsEmailTo}
+                  onChange={(event) => setAnalyticsEmailTo(event.target.value)}
+                  placeholder="you@example.com"
+                />
+              </label>
+              <label className="block text-[12px] font-medium text-foreground">
+                Timezone
+                <FormInput
+                  className="mt-1"
+                  value={analyticsTimezone}
+                  onChange={(event) => setAnalyticsTimezone(event.target.value)}
+                  placeholder="Asia/Dubai"
+                />
+              </label>
+            </div>
+            <div className="grid gap-2 px-5 py-3 md:grid-cols-3">
+              {[
+                ["daily", "Daily", analyticsDaily, setAnalyticsDaily],
+                ["weekly", "Weekly", analyticsWeekly, setAnalyticsWeekly],
+                ["monthly", "Monthly", analyticsMonthly, setAnalyticsMonthly],
+              ].map(([key, label, checked, setter]) => (
+                <label key={key as string} className="flex items-center gap-2 rounded-lg bg-sidebar/50 p-3 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={checked as boolean}
+                    onChange={(event) => (setter as (value: boolean) => void)(event.target.checked)}
+                  />
+                  {label as string}
+                </label>
+              ))}
+            </div>
+            <div className="grid gap-2 px-5 py-3 md:grid-cols-3">
+              {ANALYTICS_METRICS.map((metric) => (
+                <label key={metric.key} className="flex items-center gap-2 text-[13px] text-foreground">
+                  <input
+                    type="checkbox"
+                    checked={analyticsMetrics.includes(metric.key)}
+                    onChange={() => toggleAnalyticsMetric(metric.key)}
+                  />
+                  {metric.label}
+                </label>
+              ))}
+            </div>
+            <SettingsCardRow
+              icon={Send}
+              label="Delivery"
+              detail="SMTP must be enabled above. Duplicate report emails are prevented by period tracking."
+            >
+              <Button
+                type="button"
+                onClick={handleSaveAnalyticsEmail}
+                disabled={saveAnalyticsEmail.isPending}
+              >
+                {saveAnalyticsEmail.isPending ? "Saving..." : "Save schedule"}
+              </Button>
+            </SettingsCardRow>
+            {analyticsError ? (
+              <SettingsCardNote tone="destructive">{analyticsError}</SettingsCardNote>
+            ) : null}
+            {analyticsMessage ? <SettingsCardNote>{analyticsMessage}</SettingsCardNote> : null}
+          </>
+        )}
+      </SettingsCard>
 
       <SettingsCard
         title="Email templates"

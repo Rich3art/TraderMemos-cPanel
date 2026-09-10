@@ -58,6 +58,7 @@ type Querier interface {
 	GetAlertChannel(ctx context.Context, arg GetAlertChannelParams) (AlertChannel, error)
 	GetAlertSettings(ctx context.Context, userID string) (AlertSetting, error)
 	GetAnnualGoal(ctx context.Context, arg GetAnnualGoalParams) (AnnualGoal, error)
+	GetAnalyticsEmailSettings(ctx context.Context, userID string) (AnalyticsEmailSetting, error)
 	GetAttachment(ctx context.Context, arg GetAttachmentParams) (TradeAttachment, error)
 	GetCashTransactionByImportBatch(ctx context.Context, arg GetCashTransactionByImportBatchParams) (CashTransaction, error)
 	GetChartAnnotation(ctx context.Context, arg GetChartAnnotationParams) (ChartAnnotation, error)
@@ -112,6 +113,7 @@ type Querier interface {
 	ListEconomicEvents(ctx context.Context, arg ListEconomicEventsParams) ([]EconomicEvent, error)
 	ListEnabledAlertChannels(ctx context.Context, userID string) ([]AlertChannel, error)
 	ListEnabledAlertSettings(ctx context.Context) ([]AlertSetting, error)
+	ListEnabledAnalyticsEmailSettings(ctx context.Context) ([]AnalyticsEmailSetting, error)
 	ListEnabledFlexSyncSettings(ctx context.Context) ([]FlexSyncSetting, error)
 	ListEmailTemplates(ctx context.Context) ([]EmailTemplate, error)
 	ListExecutionsForAccount(ctx context.Context, arg ListExecutionsForAccountParams) ([]Execution, error)
@@ -172,6 +174,7 @@ type Querier interface {
 	UpsertAlertChannel(ctx context.Context, arg UpsertAlertChannelParams) (AlertChannel, error)
 	UpsertAlertSettings(ctx context.Context, arg UpsertAlertSettingsParams) (AlertSetting, error)
 	UpsertAnnualGoal(ctx context.Context, arg UpsertAnnualGoalParams) (AnnualGoal, error)
+	UpsertAnalyticsEmailSettings(ctx context.Context, arg UpsertAnalyticsEmailSettingsParams) (AnalyticsEmailSetting, error)
 	UpsertChartAnnotation(ctx context.Context, arg UpsertChartAnnotationParams) (ChartAnnotation, error)
 	UpsertChecklistTemplate(ctx context.Context, arg UpsertChecklistTemplateParams) (ChecklistTemplate, error)
 	UpsertCoachSettings(ctx context.Context, arg UpsertCoachSettingsParams) (CoachSetting, error)
@@ -187,6 +190,7 @@ type Querier interface {
 	UpsertRiskRules(ctx context.Context, arg UpsertRiskRulesParams) (RiskRule, error)
 	UpsertEmailTemplate(ctx context.Context, arg UpsertEmailTemplateParams) (EmailTemplate, error)
 	UpsertSmtpSettings(ctx context.Context, arg UpsertSmtpSettingsParams) (SmtpSetting, error)
+	UpdateAnalyticsEmailLastSent(ctx context.Context, arg UpdateAnalyticsEmailLastSentParams) error
 	UpsertTrade(ctx context.Context, arg UpsertTradeParams) error
 	UpsertTradeJournal(ctx context.Context, arg UpsertTradeJournalParams) error
 	UpsertUserPreferences(ctx context.Context, arg UpsertUserPreferencesParams) (UserPreference, error)

@@ -1,0 +1,14 @@
+CREATE TABLE IF NOT EXISTS analytics_email_settings (
+  user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  enabled INTEGER NOT NULL DEFAULT 0,
+  email TEXT NOT NULL DEFAULT '',
+  timezone TEXT NOT NULL DEFAULT 'UTC',
+  daily INTEGER NOT NULL DEFAULT 0,
+  weekly INTEGER NOT NULL DEFAULT 0,
+  monthly INTEGER NOT NULL DEFAULT 0,
+  metrics_json TEXT NOT NULL DEFAULT '[]',
+  last_daily_sent_for TEXT NOT NULL DEFAULT '',
+  last_weekly_sent_for TEXT NOT NULL DEFAULT '',
+  last_monthly_sent_for TEXT NOT NULL DEFAULT '',
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

@@ -292,6 +292,15 @@ func (p *PG) GetAnnualGoal(ctx context.Context, arg GetAnnualGoalParams) (Annual
 	return AnnualGoal(v), nil
 }
 
+func (p *PG) GetAnalyticsEmailSettings(ctx context.Context, userID string) (AnalyticsEmailSetting, error) {
+	row := p.db.QueryRowContext(ctx, `SELECT user_id, enabled, email, timezone, daily, weekly, monthly, metrics_json, last_daily_sent_for, last_weekly_sent_for, last_monthly_sent_for, updated_at
+FROM analytics_email_settings
+WHERE user_id = $1`, userID)
+	var i AnalyticsEmailSetting
+	err := row.Scan(&i.UserID, &i.Enabled, &i.Email, &i.Timezone, &i.Daily, &i.Weekly, &i.Monthly, &i.MetricsJson, &i.LastDailySentFor, &i.LastWeeklySentFor, &i.LastMonthlySentFor, &i.UpdatedAt)
+	return i, err
+}
+
 func (p *PG) GetAttachment(ctx context.Context, arg GetAttachmentParams) (TradeAttachment, error) {
 	v, err := p.q.GetAttachment(ctx, storepg.GetAttachmentParams(arg))
 	if err != nil {
@@ -848,6 +857,26 @@ func (p *PG) ListEnabledAlertSettings(ctx context.Context) ([]AlertSetting, erro
 	}(), nil
 }
 
+func (p *PG) ListEnabledAnalyticsEmailSettings(ctx context.Context) ([]AnalyticsEmailSetting, error) {
+	rows, err := p.db.QueryContext(ctx, `SELECT user_id, enabled, email, timezone, daily, weekly, monthly, metrics_json, last_daily_sent_for, last_weekly_sent_for, last_monthly_sent_for, updated_at
+FROM analytics_email_settings
+WHERE enabled = 1 AND email <> '' AND (daily = 1 OR weekly = 1 OR monthly = 1)
+ORDER BY user_id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []AnalyticsEmailSetting{}
+	for rows.Next() {
+		var i AnalyticsEmailSetting
+		if err := rows.Scan(&i.UserID, &i.Enabled, &i.Email, &i.Timezone, &i.Daily, &i.Weekly, &i.Monthly, &i.MetricsJson, &i.LastDailySentFor, &i.LastWeeklySentFor, &i.LastMonthlySentFor, &i.UpdatedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	return items, rows.Err()
+}
+
 func (p *PG) ListEmailTemplates(ctx context.Context) ([]EmailTemplate, error) {
 	v, err := p.q.ListEmailTemplates(ctx)
 	if err != nil {
@@ -1397,6 +1426,25 @@ func (p *PG) UpsertAnnualGoal(ctx context.Context, arg UpsertAnnualGoalParams) (
 	return AnnualGoal(v), nil
 }
 
+func (p *PG) UpsertAnalyticsEmailSettings(ctx context.Context, arg UpsertAnalyticsEmailSettingsParams) (AnalyticsEmailSetting, error) {
+	row := p.db.QueryRowContext(ctx, `INSERT INTO analytics_email_settings (user_id, enabled, email, timezone, daily, weekly, monthly, metrics_json, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+ON CONFLICT(user_id) DO UPDATE SET
+  enabled = excluded.enabled,
+  email = excluded.email,
+  timezone = excluded.timezone,
+  daily = excluded.daily,
+  weekly = excluded.weekly,
+  monthly = excluded.monthly,
+  metrics_json = excluded.metrics_json,
+  updated_at = NOW()
+RETURNING user_id, enabled, email, timezone, daily, weekly, monthly, metrics_json, last_daily_sent_for, last_weekly_sent_for, last_monthly_sent_for, updated_at`,
+		arg.UserID, arg.Enabled, arg.Email, arg.Timezone, arg.Daily, arg.Weekly, arg.Monthly, arg.MetricsJson)
+	var i AnalyticsEmailSetting
+	err := row.Scan(&i.UserID, &i.Enabled, &i.Email, &i.Timezone, &i.Daily, &i.Weekly, &i.Monthly, &i.MetricsJson, &i.LastDailySentFor, &i.LastWeeklySentFor, &i.LastMonthlySentFor, &i.UpdatedAt)
+	return i, err
+}
+
 func (p *PG) UpsertChartAnnotation(ctx context.Context, arg UpsertChartAnnotationParams) (ChartAnnotation, error) {
 	v, err := p.q.UpsertChartAnnotation(ctx, storepg.UpsertChartAnnotationParams(arg))
 	if err != nil {
@@ -1507,6 +1555,18 @@ func (p *PG) UpsertSmtpSettings(ctx context.Context, arg UpsertSmtpSettingsParam
 		FromName:   v.FromName,
 		UpdatedAt:  v.UpdatedAt,
 	}, nil
+}
+
+func (p *PG) UpdateAnalyticsEmailLastSent(ctx context.Context, arg UpdateAnalyticsEmailLastSentParams) error {
+	column := "last_daily_sent_for"
+	switch arg.Frequency {
+	case "weekly":
+		column = "last_weekly_sent_for"
+	case "monthly":
+		column = "last_monthly_sent_for"
+	}
+	_, err := p.db.ExecContext(ctx, "UPDATE analytics_email_settings SET "+column+" = $1, updated_at = NOW() WHERE user_id = $2", arg.PeriodKey, arg.UserID)
+	return err
 }
 
 func (p *PG) UpsertEconomicEvent(ctx context.Context, arg UpsertEconomicEventParams) error {

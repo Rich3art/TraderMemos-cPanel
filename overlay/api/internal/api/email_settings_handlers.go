@@ -1,19 +1,15 @@
 package api
 
 import (
-	"crypto/tls"
 	"database/sql"
 	"errors"
-	"fmt"
-	"net"
 	"net/http"
 	"net/mail"
-	"net/smtp"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/labstack/echo/v5"
+	"github.com/tradermemos/api/internal/mailer"
 	"github.com/tradermemos/api/internal/ocr"
 	"github.com/tradermemos/api/internal/store"
 )
@@ -148,7 +144,7 @@ func (s *Server) handleTestEmailSettings(c *echo.Context) error {
 	if row.Enabled != 1 {
 		return Fail(http.StatusBadRequest, "bad_request", "SMTP email is disabled", nil)
 	}
-	if err := sendSMTPMail(row, []string{toEmail}, "TraderMemo SMTP test", "This is a test email from TraderMemo."); err != nil {
+	if err := mailer.SendSMTPMail(row, []string{toEmail}, "TraderMemo SMTP test", "This is a test email from TraderMemo."); err != nil {
 		return Fail(http.StatusBadGateway, "smtp_failed", "SMTP test failed: "+err.Error(), nil)
 	}
 	return c.JSON(http.StatusOK, map[string]any{"ok": true})
@@ -265,88 +261,4 @@ func toEmailTemplateDTO(row store.EmailTemplate) emailTemplateDTO {
 		Body:      row.Body,
 		UpdatedAt: row.UpdatedAt,
 	}
-}
-
-func sendSMTPMail(cfg store.SmtpSetting, to []string, subject, body string) error {
-	host := strings.TrimSpace(cfg.Host)
-	addr := net.JoinHostPort(host, strconv.FormatInt(cfg.Port, 10))
-	from := strings.TrimSpace(cfg.FromEmail)
-	if host == "" || from == "" {
-		return errors.New("SMTP host and from email are required")
-	}
-	if _, err := mail.ParseAddress(from); err != nil {
-		return errors.New("from email is invalid")
-	}
-	for _, recipient := range to {
-		if _, err := mail.ParseAddress(recipient); err != nil {
-			return errors.New("recipient email is invalid")
-		}
-	}
-	fromHeader := from
-	if strings.TrimSpace(cfg.FromName) != "" {
-		fromHeader = (&mail.Address{Name: strings.TrimSpace(cfg.FromName), Address: from}).String()
-	}
-	msg := strings.Join([]string{
-		"From: " + fromHeader,
-		"To: " + strings.Join(to, ", "),
-		"Subject: " + subject,
-		"MIME-Version: 1.0",
-		"Content-Type: text/plain; charset=UTF-8",
-		"",
-		body,
-	}, "\r\n")
-	var auth smtp.Auth
-	if strings.TrimSpace(cfg.Username) != "" {
-		auth = smtp.PlainAuth("", cfg.Username, cfg.Password, host)
-	}
-	switch strings.ToLower(strings.TrimSpace(cfg.Encryption)) {
-	case "tls":
-		conn, err := tls.DialWithDialer(&net.Dialer{Timeout: 10 * time.Second}, "tcp", addr, &tls.Config{ServerName: host, MinVersion: tls.VersionTLS12})
-		if err != nil {
-			return err
-		}
-		defer conn.Close()
-		client, err := smtp.NewClient(conn, host)
-		if err != nil {
-			return err
-		}
-		defer client.Close()
-		return smtpSendWithClient(client, auth, from, to, []byte(msg))
-	case "starttls":
-		client, err := smtp.Dial(addr)
-		if err != nil {
-			return err
-		}
-		defer client.Close()
-		if err := client.StartTLS(&tls.Config{ServerName: host, MinVersion: tls.VersionTLS12}); err != nil {
-			return err
-		}
-		return smtpSendWithClient(client, auth, from, to, []byte(msg))
-	default:
-		return smtp.SendMail(addr, auth, from, to, []byte(msg))
-	}
-}
-
-func smtpSendWithClient(client *smtp.Client, auth smtp.Auth, from string, to []string, msg []byte) error {
-	if auth != nil {
-		if err := client.Auth(auth); err != nil {
-			return err
-		}
-	}
-	if err := client.Mail(from); err != nil {
-		return err
-	}
-	for _, recipient := range to {
-		if err := client.Rcpt(recipient); err != nil {
-			return err
-		}
-	}
-	w, err := client.Data()
-	if err != nil {
-		return err
-	}
-	if _, err := fmt.Fprint(w, string(msg)); err != nil {
-		return err
-	}
-	return w.Close()
 }

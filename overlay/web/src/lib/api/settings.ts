@@ -98,6 +98,17 @@ export interface EmailTemplate {
   updated_at?: string;
 }
 
+export interface AnalyticsEmailSettings {
+  enabled: boolean;
+  email: string;
+  timezone: string;
+  daily: boolean;
+  weekly: boolean;
+  monthly: boolean;
+  metrics: string[];
+  updated_at?: string;
+}
+
 export const settingsApi = {
   getRiskRules: () => apiFetch<RiskRules>("/settings/risk-rules"),
   putRiskRules: (body: RiskRules) =>
@@ -203,6 +214,13 @@ export const settingsApi = {
   testSmtpSettings: (body: { to_email: string }) =>
     apiFetch<{ ok: boolean }>("/settings/email/test", {
       method: "POST",
+      body: JSON.stringify(body),
+    }),
+  getAnalyticsEmailSettings: () =>
+    apiFetch<AnalyticsEmailSettings>("/settings/analytics-emails"),
+  putAnalyticsEmailSettings: (body: AnalyticsEmailSettings) =>
+    apiFetch<AnalyticsEmailSettings>("/settings/analytics-emails", {
+      method: "PUT",
       body: JSON.stringify(body),
     }),
 };

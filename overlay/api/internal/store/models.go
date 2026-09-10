@@ -86,6 +86,21 @@ type AnnualGoal struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+type AnalyticsEmailSetting struct {
+	UserID             string    `json:"user_id"`
+	Enabled            int64     `json:"enabled"`
+	Email              string    `json:"email"`
+	Timezone           string    `json:"timezone"`
+	Daily              int64     `json:"daily"`
+	Weekly             int64     `json:"weekly"`
+	Monthly            int64     `json:"monthly"`
+	MetricsJson        string    `json:"metrics_json"`
+	LastDailySentFor   string    `json:"last_daily_sent_for"`
+	LastWeeklySentFor  string    `json:"last_weekly_sent_for"`
+	LastMonthlySentFor string    `json:"last_monthly_sent_for"`
+	UpdatedAt          time.Time `json:"updated_at"`
+}
+
 type CashTransaction struct {
 	ID            string         `json:"id"`
 	UserID        string         `json:"user_id"`

@@ -176,6 +176,13 @@ func main() {
 				logger,
 			))
 		}
+		if cfg.JobAnalyticsEmailIntervalMin > 0 {
+			runner.Register(jobs.NewAnalyticsEmails(
+				q,
+				time.Duration(cfg.JobAnalyticsEmailIntervalMin)*time.Minute,
+				logger,
+			))
+		}
 		if names := runner.Names(); len(names) > 0 {
 			runner.Start(context.Background())
 			logger.Info("background jobs started", "jobs", names)

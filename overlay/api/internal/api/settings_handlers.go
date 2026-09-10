@@ -33,6 +33,7 @@ func (s *Server) settingsRoutes(g *echo.Group) {
 	g.GET("/settings/commercial-feed", s.handleGetCommercialFeedSettings)
 	g.PUT("/settings/commercial-feed", s.handlePutCommercialFeedSettings)
 	s.emailSettingsRoutes(g)
+	s.analyticsEmailSettingsRoutes(g)
 }
 
 type riskRulesDTO struct {
