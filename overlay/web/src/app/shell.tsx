@@ -5,7 +5,6 @@ import { CommandPalette } from "@/components/CommandPalette";
 import { HeaderBar } from "@/components/HeaderBar";
 import { MobileNavDrawer } from "@/components/MobileNavDrawer";
 import { MobileTabBar } from "@/components/MobileTabBar";
-import { AppUpdateBanner } from "@/components/AppUpdateBanner";
 import { Toaster } from "@/components/Toaster";
 import { UnauthorizedHandler } from "@/components/UnauthorizedHandler";
 import { FxConverterModal } from "@/components/tools/FxConverterModal";
@@ -169,7 +168,6 @@ export function AppShell() {
   return (
     <Toaster>
       <UnauthorizedHandler />
-      <AppUpdateBanner />
       {!authed ? <UnauthedGate /> : <AuthedShell />}
     </Toaster>
   );

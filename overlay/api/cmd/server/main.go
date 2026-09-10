@@ -122,6 +122,7 @@ func main() {
 		JWTSecret:         cfg.JWTSecret,
 		JWT:               jwt,
 		Auth:              auth.NewService(q, jwt, cfg.AllowRegistration),
+		DB:                conn,
 		Store:             q,
 		Trades:            tradesSvc,
 		Alerts:            alertsSvc,

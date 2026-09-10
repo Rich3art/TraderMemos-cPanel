@@ -2,10 +2,8 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import { PanelLeftClose, PanelLeftOpen, Settings } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useLayoutEffect, useRef, useState } from "react";
-import { useAppUpdate } from "@/lib/appUpdate";
 import { useFlexSyncAttention } from "@/lib/hooks/useFlexSync";
 import { cn } from "@/lib/cn";
-import { useDisplayPrefs } from "@/lib/displayPrefs";
 import { navLabel } from "@/lib/locale";
 import { isRouteActive, MAIN_ROUTES, PRIMARY_NAV, SECONDARY_NAV } from "@/lib/navItems";
 import { useUI } from "@/lib/ui";
@@ -29,7 +27,7 @@ function RailLink({
   label: string;
   icon: LucideIcon;
   active: boolean;
-  /** Quiet attention dot (e.g. an update is available — detail lives on the page). */
+  /** Quiet attention dot for background sync issues. */
   dot?: boolean;
   /** destructive marks something broken (a failing sync), primary something new. */
   dotTone?: "primary" | "destructive";
@@ -94,13 +92,6 @@ export function AppNav() {
 
   const activeMain = MAIN_ROUTES.find((r) => isRouteActive(pathname, r.to));
   const settingsActive = isRouteActive(pathname, "/settings");
-  // Non-actionable update states (web/API behind a release, deployment
-  // mismatch) don't toast — they show as a quiet dot here; Settings → About
-  // carries the detail. The waiting-SW reload keeps the toast.
-  const updateAttention = useAppUpdate(
-    (s) => s.swReady || s.webBehind || s.apiBehind || s.versionMismatch,
-  );
-  const updateNotices = useDisplayPrefs((s) => s.updateNotices);
   // A failing broker sync is otherwise invisible until someone opens the right
   // modal — a silently dead sync looks identical to a quiet trading week.
   const syncAttention = useFlexSyncAttention();
@@ -252,8 +243,8 @@ export function AppNav() {
             label={label("settings")}
             icon={Settings}
             active={settingsActive}
-            dot={syncAttention || (updateNotices && updateAttention)}
-            dotTone={syncAttention ? "destructive" : "primary"}
+            dot={syncAttention}
+            dotTone="destructive"
             collapsed={collapsed}
           />
         </div>

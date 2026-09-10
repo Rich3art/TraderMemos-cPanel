@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"database/sql"
 	"log/slog"
 	"net/http"
 	"os"
@@ -29,6 +30,7 @@ type Deps struct {
 	JWTSecret      string
 	Auth           *auth.Service
 	JWT            *auth.JWT
+	DB             *sql.DB
 	Store          store.Querier
 	Trades         *trades.Service
 	Logger         *slog.Logger
@@ -229,6 +231,7 @@ func (s *Server) routes() {
 	s.noteRoutes(protected)
 	s.feedbackRoutes(protected)
 	s.getFundedRoutes(protected)
+	s.contentRoutes(protected)
 	s.checklistRoutes(protected)
 	s.marketRoutes(protected)
 	s.economicEventRoutes(protected)

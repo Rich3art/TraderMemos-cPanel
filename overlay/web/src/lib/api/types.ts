@@ -447,6 +447,35 @@ export interface ImportBatch {
   created_at: string;
 }
 
+export interface ContentLink {
+  label: string;
+  url: string;
+}
+
+export interface ContentPage {
+  slug: string;
+  title: string;
+  summary: string;
+  body: string;
+  image_url: string;
+  links: ContentLink[];
+  updated_at: string;
+}
+
+export interface ResourcePost {
+  id: string;
+  slug: string;
+  title: string;
+  excerpt: string;
+  body: string;
+  image_url: string;
+  tags: string;
+  display_order: number;
+  published: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface RowError {
   row: number;
   message: string;

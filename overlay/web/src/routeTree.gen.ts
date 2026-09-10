@@ -26,6 +26,7 @@ import { Route as NotesRouteImport } from './routes/notes'
 import { Route as PlaybookRouteImport } from './routes/playbook'
 import { Route as ReplayRouteImport } from './routes/replay'
 import { Route as ReportsRouteImport } from './routes/reports'
+import { Route as ResourcesRouteImport } from './routes/resources'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SetupRouteImport } from './routes/setup'
 import { Route as TradesRouteImport } from './routes/trades'
@@ -121,6 +122,11 @@ const ReportsRoute = ReportsRouteImport.update({
   path: '/reports',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ResourcesRoute = ResourcesRouteImport.update({
+  id: '/resources',
+  path: '/resources',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -185,6 +191,7 @@ export interface FileRoutesByFullPath {
   '/playbook': typeof PlaybookRoute
   '/replay': typeof ReplayRoute
   '/reports': typeof ReportsRoute
+  '/resources': typeof ResourcesRoute
   '/settings': typeof SettingsRoute
   '/setup': typeof SetupRoute
   '/trades': typeof TradesRouteWithChildren
@@ -213,6 +220,7 @@ export interface FileRoutesByTo {
   '/playbook': typeof PlaybookRoute
   '/replay': typeof ReplayRoute
   '/reports': typeof ReportsRoute
+  '/resources': typeof ResourcesRoute
   '/settings': typeof SettingsRoute
   '/setup': typeof SetupRoute
   '/wrapped': typeof WrappedRoute
@@ -241,6 +249,7 @@ export interface FileRoutesById {
   '/playbook': typeof PlaybookRoute
   '/replay': typeof ReplayRoute
   '/reports': typeof ReportsRoute
+  '/resources': typeof ResourcesRoute
   '/settings': typeof SettingsRoute
   '/setup': typeof SetupRoute
   '/trades': typeof TradesRouteWithChildren
@@ -271,6 +280,7 @@ export interface FileRouteTypes {
     | '/playbook'
     | '/replay'
     | '/reports'
+    | '/resources'
     | '/settings'
     | '/setup'
     | '/trades'
@@ -299,6 +309,7 @@ export interface FileRouteTypes {
     | '/playbook'
     | '/replay'
     | '/reports'
+    | '/resources'
     | '/settings'
     | '/setup'
     | '/wrapped'
@@ -326,6 +337,7 @@ export interface FileRouteTypes {
     | '/playbook'
     | '/replay'
     | '/reports'
+    | '/resources'
     | '/settings'
     | '/setup'
     | '/trades'
@@ -355,6 +367,7 @@ export interface RootRouteChildren {
   PlaybookRoute: typeof PlaybookRoute
   ReplayRoute: typeof ReplayRoute
   ReportsRoute: typeof ReportsRoute
+  ResourcesRoute: typeof ResourcesRoute
   SettingsRoute: typeof SettingsRoute
   SetupRoute: typeof SetupRoute
   TradesRoute: typeof TradesRouteWithChildren
@@ -485,6 +498,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReportsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/resources': {
+      id: '/resources'
+      path: '/resources'
+      fullPath: '/resources'
+      preLoaderRoute: typeof ResourcesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings': {
       id: '/settings'
       path: '/settings'
@@ -582,6 +602,7 @@ const rootRouteChildren: RootRouteChildren = {
   PlaybookRoute: PlaybookRoute,
   ReplayRoute: ReplayRoute,
   ReportsRoute: ReportsRoute,
+  ResourcesRoute: ResourcesRoute,
   SettingsRoute: SettingsRoute,
   SetupRoute: SetupRoute,
   TradesRoute: TradesRouteWithChildren,
