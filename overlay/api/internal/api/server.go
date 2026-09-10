@@ -209,6 +209,7 @@ func (s *Server) routes() {
 		public.Use(middleware.RateLimiter(publicStore))
 	}
 	s.publicShareRoutes(public)
+	s.publicSubscriptionRoutes(public)
 
 	protected := v1.Group("")
 	if s.deps.JWT != nil {
@@ -243,5 +244,6 @@ func (s *Server) routes() {
 	s.meRoutes(protected)
 	s.adminRoutes(protected)
 	s.roleRoutes(protected)
+	s.subscriptionRoutes(protected)
 	s.preferenceRoutes(protected)
 }

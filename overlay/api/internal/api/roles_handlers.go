@@ -80,6 +80,7 @@ var permissionCatalog = []permissionDef{
 	{"users.manage", "Users: Manage", "Manage users.", "Administration"},
 	{"roles.manage", "Roles: Manage", "Create roles and assign permissions.", "Administration"},
 	{"payments.manage", "Payments: Manage", "Manage subscription and payment settings.", "Administration"},
+	{"subscriptions.manage", "Subscriptions: Manage", "Create subscription packages and manage access.", "Administration"},
 }
 
 func (s *Server) roleRoutes(g *echo.Group) {
@@ -359,6 +360,8 @@ func requiredPermission(c *echo.Context) string {
 		return "roles.manage"
 	case strings.HasPrefix(path, "/api/v1/admin/users"):
 		return "users.manage"
+	case strings.HasPrefix(path, "/api/v1/admin/subscription"):
+		return "subscriptions.manage"
 	case strings.HasPrefix(path, "/api/v1/accounts"):
 		if write {
 			return "accounts.manage"

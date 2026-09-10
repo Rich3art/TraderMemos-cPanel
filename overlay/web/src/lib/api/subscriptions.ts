@@ -1,0 +1,71 @@
+import { apiFetch } from "./client";
+
+export interface SubscriptionPackage {
+  id: string;
+  slug: string;
+  name: string;
+  role_id: string;
+  price: number;
+  currency: string;
+  image_url: string;
+  description: string;
+  features: string[];
+  access_days: number;
+  published: boolean;
+  public_url: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SubscriptionPackageBody {
+  slug: string;
+  name: string;
+  role_id: string;
+  price: number;
+  currency: string;
+  image_url: string;
+  description: string;
+  features: string[];
+  access_days: number;
+  published: boolean;
+}
+
+export interface UserSubscription {
+  id: string;
+  user_id: string;
+  package_id: string;
+  role_id: string;
+  provider: string;
+  provider_ref: string;
+  status: string;
+  starts_at: string | null;
+  expires_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export const subscriptionsApi = {
+  listPackages: () => apiFetch<SubscriptionPackage[]>("/admin/subscriptions/packages"),
+  createPackage: (body: SubscriptionPackageBody) =>
+    apiFetch<SubscriptionPackage>("/admin/subscriptions/packages", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  updatePackage: (id: string, body: SubscriptionPackageBody) =>
+    apiFetch<SubscriptionPackage>(`/admin/subscriptions/packages/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+  deletePackage: (id: string) =>
+    apiFetch<void>(`/admin/subscriptions/packages/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    }),
+  listRecords: () => apiFetch<UserSubscription[]>("/admin/subscriptions/records"),
+  grant: (body: { user_id: string; package_id: string; provider?: string; provider_ref?: string }) =>
+    apiFetch<UserSubscription>("/admin/subscriptions/grant", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  getPublicPackage: (slug: string) =>
+    apiFetch<SubscriptionPackage>(`/public/packages/${encodeURIComponent(slug)}`),
+};

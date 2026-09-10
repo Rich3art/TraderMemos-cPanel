@@ -4,6 +4,7 @@ import {
   KeyRound,
   Link2,
   Mail,
+  BadgeDollarSign,
   DatabaseZap,
   Shield,
   ShieldCheck,
@@ -28,6 +29,7 @@ import { CommercialFeedTab } from "./settings/commercial-feed-tab";
 import { EmailTab } from "./settings/email-tab";
 import { RolesTab } from "./settings/roles-tab";
 import { SharingTab } from "./settings/sharing-tab";
+import { SubscriptionsTab } from "./settings/subscriptions-tab";
 import { AccountsTab, AiTab, GeneralTab, JournalTab, RulesTab } from "./settings/settings-sections";
 import { ShortcutsTab } from "./settings/shortcuts-tab";
 import { UsersTab } from "./settings/users-tab";
@@ -113,6 +115,7 @@ const NAV_ICONS: Record<SettingsSectionId, typeof Wallet> = {
   api: KeyRound,
   "commercial-feed": DatabaseZap,
   email: Mail,
+  subscriptions: BadgeDollarSign,
   sharing: Link2,
   about: Github,
 };
@@ -129,6 +132,7 @@ export function SettingsView(props: SettingsViewProps) {
     .filter((item) => item.id !== "users" || (me.data?.is_admin ?? false))
     .filter((item) => item.id !== "roles" || (me.data?.is_admin ?? false))
     .filter((item) => item.id !== "email" || (me.data?.is_admin ?? false))
+    .filter((item) => item.id !== "subscriptions" || (me.data?.is_admin ?? false))
     .map((item) => ({
       ...item,
       icon: NAV_ICONS[item.id],
@@ -193,6 +197,7 @@ export function SettingsView(props: SettingsViewProps) {
         {section === "api" && <ApiTab />}
         {section === "commercial-feed" && <CommercialFeedTab />}
         {section === "email" && <EmailTab />}
+        {section === "subscriptions" && <SubscriptionsTab />}
         {section === "sharing" && <SharingTab />}
         {section === "about" && <AboutTab />}
       </Page>

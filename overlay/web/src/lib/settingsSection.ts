@@ -13,6 +13,7 @@ export const SETTINGS_SECTION_IDS: SettingsSectionId[] = [
   "api",
   "commercial-feed",
   "email",
+  "subscriptions",
   "sharing",
   "about",
 ];
