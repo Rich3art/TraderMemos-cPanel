@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   settingsApi,
   type AnalyticsEmailSettings,
+  type DailyJournalReminderSettings,
   type EmailTemplate,
   type SmtpSettingsPut,
 } from "@/lib/api/settings";
@@ -9,6 +10,7 @@ import {
 const smtpSettingsKey = ["settings", "email", "smtp"] as const;
 const emailTemplatesKey = ["settings", "email", "templates"] as const;
 const analyticsEmailSettingsKey = ["settings", "email", "analytics"] as const;
+const dailyJournalReminderSettingsKey = ["settings", "rules", "daily-journal-reminder"] as const;
 
 export function useSmtpSettings() {
   return useQuery({
@@ -63,5 +65,21 @@ export function useSaveAnalyticsEmailSettings() {
   return useMutation({
     mutationFn: (body: AnalyticsEmailSettings) => settingsApi.putAnalyticsEmailSettings(body),
     onSuccess: (data) => qc.setQueryData(analyticsEmailSettingsKey, data),
+  });
+}
+
+export function useDailyJournalReminderSettings() {
+  return useQuery({
+    queryKey: dailyJournalReminderSettingsKey,
+    queryFn: () => settingsApi.getDailyJournalReminderSettings(),
+  });
+}
+
+export function useSaveDailyJournalReminderSettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: DailyJournalReminderSettings) =>
+      settingsApi.putDailyJournalReminderSettings(body),
+    onSuccess: (data) => qc.setQueryData(dailyJournalReminderSettingsKey, data),
   });
 }

@@ -101,6 +101,18 @@ type AnalyticsEmailSetting struct {
 	UpdatedAt          time.Time `json:"updated_at"`
 }
 
+type DailyJournalReminderSetting struct {
+	UserID       string    `json:"user_id"`
+	Enabled      int64     `json:"enabled"`
+	ReminderTime string    `json:"reminder_time"`
+	Timezone     string    `json:"timezone"`
+	PushEnabled  int64     `json:"push_enabled"`
+	EmailEnabled int64     `json:"email_enabled"`
+	Email        string    `json:"email"`
+	LastSentFor  string    `json:"last_sent_for"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
 type CashTransaction struct {
 	ID            string         `json:"id"`
 	UserID        string         `json:"user_id"`

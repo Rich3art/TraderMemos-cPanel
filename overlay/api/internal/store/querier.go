@@ -59,6 +59,7 @@ type Querier interface {
 	GetAlertSettings(ctx context.Context, userID string) (AlertSetting, error)
 	GetAnnualGoal(ctx context.Context, arg GetAnnualGoalParams) (AnnualGoal, error)
 	GetAnalyticsEmailSettings(ctx context.Context, userID string) (AnalyticsEmailSetting, error)
+	GetDailyJournalReminderSettings(ctx context.Context, userID string) (DailyJournalReminderSetting, error)
 	GetAttachment(ctx context.Context, arg GetAttachmentParams) (TradeAttachment, error)
 	GetCashTransactionByImportBatch(ctx context.Context, arg GetCashTransactionByImportBatchParams) (CashTransaction, error)
 	GetChartAnnotation(ctx context.Context, arg GetChartAnnotationParams) (ChartAnnotation, error)
@@ -114,6 +115,7 @@ type Querier interface {
 	ListEnabledAlertChannels(ctx context.Context, userID string) ([]AlertChannel, error)
 	ListEnabledAlertSettings(ctx context.Context) ([]AlertSetting, error)
 	ListEnabledAnalyticsEmailSettings(ctx context.Context) ([]AnalyticsEmailSetting, error)
+	ListEnabledDailyJournalReminders(ctx context.Context) ([]DailyJournalReminderSetting, error)
 	ListEnabledFlexSyncSettings(ctx context.Context) ([]FlexSyncSetting, error)
 	ListEmailTemplates(ctx context.Context) ([]EmailTemplate, error)
 	ListExecutionsForAccount(ctx context.Context, arg ListExecutionsForAccountParams) ([]Execution, error)
@@ -124,6 +126,7 @@ type Querier interface {
 	ListPublishedGetFundedListings(ctx context.Context) ([]GetFundedListing, error)
 	ListImportBatches(ctx context.Context, userID string) ([]ImportBatch, error)
 	ListJournalNotes(ctx context.Context, arg ListJournalNotesParams) ([]JournalNote, error)
+	JournalDailyLogExists(ctx context.Context, arg JournalDailyLogExistsParams) (int64, error)
 	ListJournalRisks(ctx context.Context, userID string) ([]ListJournalRisksRow, error)
 	ListMediaFilesForUser(ctx context.Context, userID string) ([]MediaFile, error)
 	ListAttachmentsForSetup(ctx context.Context, arg ListAttachmentsForSetupParams) ([]SetupAttachment, error)
@@ -175,6 +178,7 @@ type Querier interface {
 	UpsertAlertSettings(ctx context.Context, arg UpsertAlertSettingsParams) (AlertSetting, error)
 	UpsertAnnualGoal(ctx context.Context, arg UpsertAnnualGoalParams) (AnnualGoal, error)
 	UpsertAnalyticsEmailSettings(ctx context.Context, arg UpsertAnalyticsEmailSettingsParams) (AnalyticsEmailSetting, error)
+	UpsertDailyJournalReminderSettings(ctx context.Context, arg UpsertDailyJournalReminderSettingsParams) (DailyJournalReminderSetting, error)
 	UpsertChartAnnotation(ctx context.Context, arg UpsertChartAnnotationParams) (ChartAnnotation, error)
 	UpsertChecklistTemplate(ctx context.Context, arg UpsertChecklistTemplateParams) (ChecklistTemplate, error)
 	UpsertCoachSettings(ctx context.Context, arg UpsertCoachSettingsParams) (CoachSetting, error)
@@ -191,6 +195,7 @@ type Querier interface {
 	UpsertEmailTemplate(ctx context.Context, arg UpsertEmailTemplateParams) (EmailTemplate, error)
 	UpsertSmtpSettings(ctx context.Context, arg UpsertSmtpSettingsParams) (SmtpSetting, error)
 	UpdateAnalyticsEmailLastSent(ctx context.Context, arg UpdateAnalyticsEmailLastSentParams) error
+	UpdateDailyJournalReminderLastSent(ctx context.Context, arg UpdateDailyJournalReminderLastSentParams) error
 	UpsertTrade(ctx context.Context, arg UpsertTradeParams) error
 	UpsertTradeJournal(ctx context.Context, arg UpsertTradeJournalParams) error
 	UpsertUserPreferences(ctx context.Context, arg UpsertUserPreferencesParams) (UserPreference, error)

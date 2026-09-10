@@ -183,6 +183,13 @@ func main() {
 				logger,
 			))
 		}
+		if cfg.JobDailyJournalReminderIntervalMin > 0 {
+			runner.Register(jobs.NewDailyJournalReminders(
+				q,
+				time.Duration(cfg.JobDailyJournalReminderIntervalMin)*time.Minute,
+				logger,
+			))
+		}
 		if names := runner.Names(); len(names) > 0 {
 			runner.Start(context.Background())
 			logger.Info("background jobs started", "jobs", names)

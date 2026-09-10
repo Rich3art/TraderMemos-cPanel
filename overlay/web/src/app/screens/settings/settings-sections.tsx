@@ -3,9 +3,11 @@ import { Link } from "@tanstack/react-router";
 import type { LucideIcon } from "lucide-react";
 import {
   Building2,
+  Bell,
   Brain,
   ChevronRight,
   Check,
+  Clock3,
   Crosshair,
   Download,
   Hash,
@@ -75,6 +77,10 @@ import {
   usePsychologyQuestions,
   useSavePsychologyQuestions,
 } from "@/lib/hooks/usePsychologyQuestions";
+import {
+  useDailyJournalReminderSettings,
+  useSaveDailyJournalReminderSettings,
+} from "@/lib/hooks/useEmailSettings";
 import { useTrades } from "@/lib/hooks/useTrades";
 import { formatCashDisplay, signedCashAmount } from "@/lib/cashAmount";
 import { parseAmountToNumber } from "@/lib/amountInput";
@@ -88,6 +94,7 @@ import {
   TIME_FORMAT_OPTIONS,
   TRADE_DATE_BASIS_OPTIONS,
   marketTimezoneSelectOptions,
+  resolveDisplayTimezone,
   timezoneSelectOptions,
   type MarketTimezonePref,
   type TimeFormatPref,
@@ -120,6 +127,7 @@ import {
   SettingsCard,
   SettingsCardNote,
   SettingsCardRow,
+  SettingsToggle,
   SettingsInsetForm,
   SettingsPanelBody,
   SettingsGroup,
@@ -1077,6 +1085,9 @@ export function RulesTab({
   usePrivacyMode();
   const toast = useToastManager();
   const locale = intlLocale();
+  const savedTimezone = useDisplayPrefs((s) => s.timezone);
+  const reminderSettings = useDailyJournalReminderSettings();
+  const saveReminderSettings = useSaveDailyJournalReminderSettings();
   const goalYear = annualGoal?.year ?? new Date().getFullYear();
   const ytdFilters = useMemo(() => ytdFiltersForYear({}, goalYear), [goalYear]);
   const ytdSummaryQ = useSummary(ytdFilters);
@@ -1090,12 +1101,32 @@ export function RulesTab({
   const [checklistDraft, setChecklistDraft] = useState(checklistContent);
   const [checklistEditorKey, setChecklistEditorKey] = useState(0);
   const [checklistModalOpen, setChecklistModalOpen] = useState(false);
+  const [reminderEnabled, setReminderEnabled] = useState(false);
+  const [reminderTime, setReminderTime] = useState("18:00");
+  const [reminderTimezone, setReminderTimezone] = useState<string>(
+    resolveDisplayTimezone(savedTimezone || "UTC"),
+  );
+  const [reminderPush, setReminderPush] = useState(true);
+  const [reminderEmailEnabled, setReminderEmailEnabled] = useState(false);
+  const [reminderEmail, setReminderEmail] = useState("");
+  const [reminderError, setReminderError] = useState<string | null>(null);
 
   useEffect(() => {
     if (checklistModalOpen) return;
     setChecklistDraft(checklistContent);
     setChecklistEditorKey((k) => k + 1);
   }, [checklistContent, checklistModalOpen]);
+
+  useEffect(() => {
+    const data = reminderSettings.data;
+    if (!data) return;
+    setReminderEnabled(data.enabled);
+    setReminderTime(data.reminder_time || "18:00");
+    setReminderTimezone(data.timezone || resolveDisplayTimezone(savedTimezone || "UTC"));
+    setReminderPush(data.push_enabled);
+    setReminderEmailEnabled(data.email_enabled);
+    setReminderEmail(data.email || "");
+  }, [reminderSettings.data, savedTimezone]);
 
   const goalProgress =
     annualGoal?.amount != null && annualGoal.amount > 0 && ytdSummaryQ.data != null
@@ -1187,6 +1218,25 @@ export function RulesTab({
         title: "Could not save checklist",
         description: err instanceof Error ? err.message : "Request failed",
       });
+    }
+  }
+
+  async function handleSaveReminder() {
+    setReminderError(null);
+    try {
+      await saveReminderSettings.mutateAsync({
+        enabled: reminderEnabled,
+        reminder_time: reminderTime,
+        timezone: reminderTimezone || "UTC",
+        push_enabled: reminderPush,
+        email_enabled: reminderEmailEnabled,
+        email: reminderEmail,
+      });
+      toast.add({ title: "Daily reminder saved" });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Request failed";
+      setReminderError(message);
+      toast.add({ title: "Could not save reminder", description: message });
     }
   }
 
@@ -1457,6 +1507,124 @@ export function RulesTab({
             Checklist text saved — add <code className="text-primary">- [ ]</code> items so they
             appear on New Note.
           </SettingsCardNote>
+        )}
+      </SettingsCard>
+
+      <SettingsCard
+        title="Daily Log Reminder"
+        description="Remind me to complete the daily trading log at a chosen local time."
+      >
+        {reminderSettings.isLoading ? (
+          <div className="px-5 py-3">
+            <ListSkeleton rows={3} />
+          </div>
+        ) : reminderSettings.isError ? (
+          <SettingsCardNote tone="destructive">
+            Failed to load daily journal reminder settings.
+          </SettingsCardNote>
+        ) : (
+          <>
+            <SettingsCardRow
+              icon={Bell}
+              active={reminderEnabled}
+              label="Reminder"
+              detail="Checks once per day after the time below and skips the reminder when today's daily log already exists."
+            >
+              <SettingsToggle
+                checked={reminderEnabled}
+                onCheckedChange={setReminderEnabled}
+                disabled={saveReminderSettings.isPending}
+                aria-label="Enable daily log reminder"
+              />
+            </SettingsCardRow>
+            <SettingsCardRow
+              icon={Clock3}
+              active={reminderEnabled}
+              label="Schedule"
+              detail="Time is evaluated in the selected timezone, not the server timezone."
+              className="items-start"
+            >
+              <div className="grid w-full min-w-[220px] grid-cols-1 gap-2 sm:w-[360px] sm:grid-cols-[120px_minmax(0,1fr)]">
+                <FormInput
+                  type="time"
+                  value={reminderTime}
+                  onChange={(event) => setReminderTime(event.target.value)}
+                  disabled={saveReminderSettings.isPending}
+                  aria-label="Daily log reminder time"
+                  className="h-10 text-[13px]"
+                />
+                <NativeSelect
+                  value={reminderTimezone}
+                  onChange={(event) => setReminderTimezone(event.target.value)}
+                  disabled={saveReminderSettings.isPending}
+                  aria-label="Daily log reminder timezone"
+                  className="w-full"
+                  wrapperClassName="w-full"
+                >
+                  {marketTimezoneSelectOptions().map((option) => (
+                    <NativeSelectOption key={option.value} value={option.value}>
+                      {option.label}
+                    </NativeSelectOption>
+                  ))}
+                </NativeSelect>
+              </div>
+            </SettingsCardRow>
+            <SettingsCardRow
+              icon={Repeat}
+              active={reminderPush || reminderEmailEnabled}
+              label="Delivery"
+              detail="In-app creates a notification in TraderMemo. Email uses the SMTP settings from Settings → Email."
+              className="items-start"
+            >
+              <div className="flex w-full min-w-[220px] flex-col gap-2 sm:w-[360px]">
+                <label className="flex items-center justify-between gap-3 rounded-lg bg-muted px-3 py-2 text-[13px] text-foreground">
+                  <span>In-app notification</span>
+                  <SettingsToggle
+                    checked={reminderPush}
+                    onCheckedChange={setReminderPush}
+                    disabled={saveReminderSettings.isPending}
+                    aria-label="Enable in-app daily log reminder"
+                  />
+                </label>
+                <label className="flex items-center justify-between gap-3 rounded-lg bg-muted px-3 py-2 text-[13px] text-foreground">
+                  <span>Email</span>
+                  <SettingsToggle
+                    checked={reminderEmailEnabled}
+                    onCheckedChange={setReminderEmailEnabled}
+                    disabled={saveReminderSettings.isPending}
+                    aria-label="Enable email daily log reminder"
+                  />
+                </label>
+                <FormInput
+                  type="email"
+                  inputMode="email"
+                  value={reminderEmail}
+                  onChange={(event) => setReminderEmail(event.target.value)}
+                  disabled={!reminderEmailEnabled || saveReminderSettings.isPending}
+                  placeholder="name@example.com"
+                  aria-label="Daily log reminder email address"
+                  className="h-10 text-[13px]"
+                />
+              </div>
+            </SettingsCardRow>
+            {reminderError ? (
+              <SettingsCardNote tone="destructive">{reminderError}</SettingsCardNote>
+            ) : (
+              <SettingsCardNote>
+                Email reminders require SMTP to be enabled. The job does not send duplicates for a
+                date that was already reminded or logged.
+              </SettingsCardNote>
+            )}
+            <div className="flex justify-end px-5 pt-2">
+              <Button
+                type="button"
+                onClick={() => void handleSaveReminder()}
+                disabled={saveReminderSettings.isPending}
+              >
+                {saveReminderSettings.isPending ? "Saving..." : "Save reminder"}
+              </Button>
+            </div>
+          </>
         )}
       </SettingsCard>
 

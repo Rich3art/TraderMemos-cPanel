@@ -301,6 +301,15 @@ WHERE user_id = $1`, userID)
 	return i, err
 }
 
+func (p *PG) GetDailyJournalReminderSettings(ctx context.Context, userID string) (DailyJournalReminderSetting, error) {
+	row := p.db.QueryRowContext(ctx, `SELECT user_id, enabled, reminder_time, timezone, push_enabled, email_enabled, email, last_sent_for, updated_at
+FROM daily_journal_reminders
+WHERE user_id = $1`, userID)
+	var i DailyJournalReminderSetting
+	err := row.Scan(&i.UserID, &i.Enabled, &i.ReminderTime, &i.Timezone, &i.PushEnabled, &i.EmailEnabled, &i.Email, &i.LastSentFor, &i.UpdatedAt)
+	return i, err
+}
+
 func (p *PG) GetAttachment(ctx context.Context, arg GetAttachmentParams) (TradeAttachment, error) {
 	v, err := p.q.GetAttachment(ctx, storepg.GetAttachmentParams(arg))
 	if err != nil {
@@ -877,6 +886,26 @@ ORDER BY user_id`)
 	return items, rows.Err()
 }
 
+func (p *PG) ListEnabledDailyJournalReminders(ctx context.Context) ([]DailyJournalReminderSetting, error) {
+	rows, err := p.db.QueryContext(ctx, `SELECT user_id, enabled, reminder_time, timezone, push_enabled, email_enabled, email, last_sent_for, updated_at
+FROM daily_journal_reminders
+WHERE enabled = 1 AND (push_enabled = 1 OR (email_enabled = 1 AND email <> ''))
+ORDER BY user_id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []DailyJournalReminderSetting{}
+	for rows.Next() {
+		var i DailyJournalReminderSetting
+		if err := rows.Scan(&i.UserID, &i.Enabled, &i.ReminderTime, &i.Timezone, &i.PushEnabled, &i.EmailEnabled, &i.Email, &i.LastSentFor, &i.UpdatedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	return items, rows.Err()
+}
+
 func (p *PG) ListEmailTemplates(ctx context.Context) ([]EmailTemplate, error) {
 	v, err := p.q.ListEmailTemplates(ctx)
 	if err != nil {
@@ -1020,6 +1049,13 @@ func (p *PG) ListJournalNotes(ctx context.Context, arg ListJournalNotesParams) (
 		}
 		return out
 	}(), nil
+}
+
+func (p *PG) JournalDailyLogExists(ctx context.Context, arg JournalDailyLogExistsParams) (int64, error) {
+	row := p.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM journal_notes WHERE user_id = $1 AND note_type = 'daily_log' AND LEFT(occurred_at, 10) = $2`, arg.UserID, arg.DayKey)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
 }
 
 func (p *PG) ListJournalRisks(ctx context.Context, userID string) ([]ListJournalRisksRow, error) {
@@ -1445,6 +1481,24 @@ RETURNING user_id, enabled, email, timezone, daily, weekly, monthly, metrics_jso
 	return i, err
 }
 
+func (p *PG) UpsertDailyJournalReminderSettings(ctx context.Context, arg UpsertDailyJournalReminderSettingsParams) (DailyJournalReminderSetting, error) {
+	row := p.db.QueryRowContext(ctx, `INSERT INTO daily_journal_reminders (user_id, enabled, reminder_time, timezone, push_enabled, email_enabled, email, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+ON CONFLICT(user_id) DO UPDATE SET
+  enabled = excluded.enabled,
+  reminder_time = excluded.reminder_time,
+  timezone = excluded.timezone,
+  push_enabled = excluded.push_enabled,
+  email_enabled = excluded.email_enabled,
+  email = excluded.email,
+  updated_at = NOW()
+RETURNING user_id, enabled, reminder_time, timezone, push_enabled, email_enabled, email, last_sent_for, updated_at`,
+		arg.UserID, arg.Enabled, arg.ReminderTime, arg.Timezone, arg.PushEnabled, arg.EmailEnabled, arg.Email)
+	var i DailyJournalReminderSetting
+	err := row.Scan(&i.UserID, &i.Enabled, &i.ReminderTime, &i.Timezone, &i.PushEnabled, &i.EmailEnabled, &i.Email, &i.LastSentFor, &i.UpdatedAt)
+	return i, err
+}
+
 func (p *PG) UpsertChartAnnotation(ctx context.Context, arg UpsertChartAnnotationParams) (ChartAnnotation, error) {
 	v, err := p.q.UpsertChartAnnotation(ctx, storepg.UpsertChartAnnotationParams(arg))
 	if err != nil {
@@ -1566,6 +1620,11 @@ func (p *PG) UpdateAnalyticsEmailLastSent(ctx context.Context, arg UpdateAnalyti
 		column = "last_monthly_sent_for"
 	}
 	_, err := p.db.ExecContext(ctx, "UPDATE analytics_email_settings SET "+column+" = $1, updated_at = NOW() WHERE user_id = $2", arg.PeriodKey, arg.UserID)
+	return err
+}
+
+func (p *PG) UpdateDailyJournalReminderLastSent(ctx context.Context, arg UpdateDailyJournalReminderLastSentParams) error {
+	_, err := p.db.ExecContext(ctx, `UPDATE daily_journal_reminders SET last_sent_for = $1, updated_at = NOW() WHERE user_id = $2`, arg.DayKey, arg.UserID)
 	return err
 }
 

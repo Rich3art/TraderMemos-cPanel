@@ -109,6 +109,16 @@ export interface AnalyticsEmailSettings {
   updated_at?: string;
 }
 
+export interface DailyJournalReminderSettings {
+  enabled: boolean;
+  reminder_time: string;
+  timezone: string;
+  push_enabled: boolean;
+  email_enabled: boolean;
+  email: string;
+  updated_at?: string;
+}
+
 export const settingsApi = {
   getRiskRules: () => apiFetch<RiskRules>("/settings/risk-rules"),
   putRiskRules: (body: RiskRules) =>
@@ -220,6 +230,13 @@ export const settingsApi = {
     apiFetch<AnalyticsEmailSettings>("/settings/analytics-emails"),
   putAnalyticsEmailSettings: (body: AnalyticsEmailSettings) =>
     apiFetch<AnalyticsEmailSettings>("/settings/analytics-emails", {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  getDailyJournalReminderSettings: () =>
+    apiFetch<DailyJournalReminderSettings>("/settings/daily-journal-reminder"),
+  putDailyJournalReminderSettings: (body: DailyJournalReminderSettings) =>
+    apiFetch<DailyJournalReminderSettings>("/settings/daily-journal-reminder", {
       method: "PUT",
       body: JSON.stringify(body),
     }),
