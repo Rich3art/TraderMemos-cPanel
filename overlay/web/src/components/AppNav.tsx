@@ -3,9 +3,11 @@ import { PanelLeftClose, PanelLeftOpen, Settings } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useLayoutEffect, useRef, useState } from "react";
 import { useFlexSyncAttention } from "@/lib/hooks/useFlexSync";
+import { useMe } from "@/lib/hooks/useMe";
 import { cn } from "@/lib/cn";
 import { navLabel } from "@/lib/locale";
 import { isRouteActive, MAIN_ROUTES, PRIMARY_NAV, SECONDARY_NAV } from "@/lib/navItems";
+import { canOpenRoute } from "@/lib/permissions";
 import { useUI } from "@/lib/ui";
 import { useLocale } from "@/i18n";
 import { AppLogo } from "./AppLogo";
@@ -85,13 +87,19 @@ export function AppNav() {
   const label = (key: Parameters<typeof navLabel>[1]) => navLabel(locale, key);
   const collapsed = useUI((s) => s.sidebarCollapsed);
   const toggleSidebar = useUI((s) => s.toggleSidebar);
+  const me = useMe();
 
   const listRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef(new Map<string, HTMLAnchorElement>());
   const [pip, setPip] = useState({ top: 0, ready: false });
 
-  const activeMain = MAIN_ROUTES.find((r) => isRouteActive(pathname, r.to));
+  const primaryNav = PRIMARY_NAV.filter((item) => canOpenRoute(me.data, item.to));
+  const secondaryNav = SECONDARY_NAV.filter((item) => canOpenRoute(me.data, item.to));
+  const activeMain = MAIN_ROUTES.filter((item) => canOpenRoute(me.data, item.to)).find((r) =>
+    isRouteActive(pathname, r.to),
+  );
   const settingsActive = isRouteActive(pathname, "/settings");
+  const showSettings = canOpenRoute(me.data, "/settings");
   // A failing broker sync is otherwise invisible until someone opens the right
   // modal — a silently dead sync looks identical to a quiet trading week.
   const syncAttention = useFlexSyncAttention();
@@ -184,7 +192,7 @@ export function AppNav() {
           style={{ top: pip.top }}
         />
 
-        {PRIMARY_NAV.map((item) => (
+        {primaryNav.map((item) => (
           <RailLink
             key={item.to}
             to={item.to}
@@ -207,7 +215,7 @@ export function AppNav() {
           aria-hidden
         />
 
-        {SECONDARY_NAV.map((item) => (
+        {secondaryNav.map((item) => (
           <RailLink
             key={item.to}
             to={item.to}
@@ -231,6 +239,7 @@ export function AppNav() {
 
         <ToolsPopover variant="rail" />
 
+        {showSettings ? (
         <div className="relative">
           {settingsActive && (
             <span
@@ -248,6 +257,7 @@ export function AppNav() {
             collapsed={collapsed}
           />
         </div>
+        ) : null}
       </div>
     </nav>
   );

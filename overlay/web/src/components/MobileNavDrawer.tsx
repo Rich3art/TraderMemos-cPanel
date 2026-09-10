@@ -13,9 +13,11 @@ import { cn } from "@/lib/cn";
 import { accountBaseCurrency } from "@/lib/displayPrefs";
 import { useFilters } from "@/lib/filters";
 import { useAccounts } from "@/lib/hooks/useAccounts";
+import { useMe } from "@/lib/hooks/useMe";
 import { useLocale } from "@/i18n";
 import { navLabel } from "@/lib/locale";
 import { CREATE_ACTIONS, isRouteActive, PRIMARY_NAV, SECONDARY_NAV } from "@/lib/navItems";
+import { canOpenRoute } from "@/lib/permissions";
 import { useUI } from "@/lib/ui";
 
 function NavRow({
@@ -195,7 +197,13 @@ export function MobileNavDrawer() {
   const open = useUI((s) => s.mobileNavOpen);
   const closeMobileNav = useUI((s) => s.closeMobileNav);
   const openModal = useUI((s) => s.openModal);
+  const me = useMe();
   const label = (key: Parameters<typeof navLabel>[1]) => navLabel(locale, key);
+  const reportNav = PRIMARY_NAV.filter(
+    (item) => item.to === "/reports" && canOpenRoute(me.data, item.to),
+  );
+  const secondaryNav = SECONDARY_NAV.filter((item) => canOpenRoute(me.data, item.to));
+  const showSettings = canOpenRoute(me.data, "/settings");
   function runAction(fn: () => void) {
     closeMobileNav();
     fn();
@@ -222,7 +230,7 @@ export function MobileNavDrawer() {
           <div className="my-2 h-px bg-border" aria-hidden />
 
           <SectionLabel>More</SectionLabel>
-          {PRIMARY_NAV.filter((item) => item.to === "/reports").map((item) => (
+          {reportNav.map((item) => (
             <NavRow
               key={item.to}
               to={item.to}
@@ -232,7 +240,7 @@ export function MobileNavDrawer() {
               onNavigate={closeMobileNav}
             />
           ))}
-          {SECONDARY_NAV.map((item) => (
+          {secondaryNav.map((item) => (
             <NavRow
               key={item.to}
               to={item.to}
@@ -242,6 +250,7 @@ export function MobileNavDrawer() {
               onNavigate={closeMobileNav}
             />
           ))}
+          {showSettings ? (
           <NavRow
             to="/settings"
             label={label("settings")}
@@ -249,6 +258,7 @@ export function MobileNavDrawer() {
             active={isRouteActive(pathname, "/settings")}
             onNavigate={closeMobileNav}
           />
+          ) : null}
 
           <div className="my-2 h-px bg-border" aria-hidden />
 

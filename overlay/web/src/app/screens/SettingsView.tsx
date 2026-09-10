@@ -6,6 +6,7 @@ import {
   Mail,
   DatabaseZap,
   Shield,
+  ShieldCheck,
   Sparkles,
   Tag,
   UserRound,
@@ -25,6 +26,7 @@ import { AlertsSection } from "./settings/alerts-section";
 import { ApiTab } from "./settings/api-tab";
 import { CommercialFeedTab } from "./settings/commercial-feed-tab";
 import { EmailTab } from "./settings/email-tab";
+import { RolesTab } from "./settings/roles-tab";
 import { SharingTab } from "./settings/sharing-tab";
 import { AccountsTab, AiTab, GeneralTab, JournalTab, RulesTab } from "./settings/settings-sections";
 import { ShortcutsTab } from "./settings/shortcuts-tab";
@@ -101,6 +103,7 @@ export interface SettingsViewProps {
 const NAV_ICONS: Record<SettingsSectionId, typeof Wallet> = {
   profile: UserRound,
   users: Users,
+  roles: ShieldCheck,
   accounts: Wallet,
   rules: Shield,
   journal: Tag,
@@ -124,6 +127,7 @@ export function SettingsView(props: SettingsViewProps) {
   // explains itself to anyone who reaches it by hash.
   const navItems = settingsNavItems(locale)
     .filter((item) => item.id !== "users" || (me.data?.is_admin ?? false))
+    .filter((item) => item.id !== "roles" || (me.data?.is_admin ?? false))
     .filter((item) => item.id !== "email" || (me.data?.is_admin ?? false))
     .map((item) => ({
       ...item,
@@ -183,6 +187,7 @@ export function SettingsView(props: SettingsViewProps) {
         {section === "ai" && <AiTab />}
         {section === "profile" && <AccountTab />}
         {section === "users" && <UsersTab />}
+        {section === "roles" && <RolesTab />}
         {section === "general" && <GeneralTab />}
         {section === "shortcuts" && <ShortcutsTab />}
         {section === "api" && <ApiTab />}

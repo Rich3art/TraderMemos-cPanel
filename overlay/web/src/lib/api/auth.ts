@@ -24,6 +24,7 @@ export interface Me {
   created_at: string;
   /** Whether an authenticator app is enrolled — see POST /me/totp/start. */
   totp_enabled: boolean;
+  permissions: string[];
 }
 
 /** POST /me/totp/start — a candidate secret, not yet stored server-side. */

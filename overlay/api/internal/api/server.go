@@ -214,6 +214,7 @@ func (s *Server) routes() {
 	if s.deps.JWT != nil {
 		protected.Use(auth.Middleware(s.deps.JWT, s.deps.Store, s.deps.Store))
 	}
+	protected.Use(s.requirePermission)
 	s.accountRoutes(protected)
 	s.propRoutes(protected)
 	s.flexSyncRoutes(protected)
@@ -241,5 +242,6 @@ func (s *Server) routes() {
 	s.systemRoutes(protected)
 	s.meRoutes(protected)
 	s.adminRoutes(protected)
+	s.roleRoutes(protected)
 	s.preferenceRoutes(protected)
 }

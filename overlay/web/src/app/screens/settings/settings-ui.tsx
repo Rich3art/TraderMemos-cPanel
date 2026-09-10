@@ -33,6 +33,7 @@ export function SettingsPageHeader({
 export type SettingsSectionId =
   | "profile"
   | "users"
+  | "roles"
   | "accounts"
   | "rules"
   | "journal"

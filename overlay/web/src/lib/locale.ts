@@ -143,6 +143,7 @@ export function navLabel(locale: string, key: NavLabelKey): string {
 export type SettingsSectionId =
   | "profile"
   | "users"
+  | "roles"
   | "accounts"
   | "rules"
   | "journal"
@@ -162,6 +163,9 @@ export type SettingsLabelKey =
   | "users"
   | "usersTitle"
   | "usersDescription"
+  | "roles"
+  | "rolesTitle"
+  | "rolesDescription"
   | "syncedPrefsNote"
   | "accounts"
   | "rules"
@@ -365,6 +369,9 @@ const SETTINGS_LABELS: Record<AppLocale, Record<SettingsLabelKey, string>> = {
     users: "Users",
     usersTitle: "Users",
     usersDescription: "Everyone with an account on this server.",
+    roles: "Roles",
+    rolesTitle: "Roles & permissions",
+    rolesDescription: "Create access roles and decide which users can open menus and features.",
     syncedPrefsNote:
       "Timezones, clock format, display currency and the screenshots cap follow your account — they apply on every device you sign in on. Language and theme stay on this one.",
     generalTitle: "General",
@@ -571,6 +578,9 @@ const SETTINGS_LABELS: Record<AppLocale, Record<SettingsLabelKey, string>> = {
     users: "使用者",
     usersTitle: "使用者",
     usersDescription: "此伺服器上所有擁有帳戶的人。",
+    roles: "角色",
+    rolesTitle: "角色與權限",
+    rolesDescription: "建立存取角色，並決定哪些使用者可開啟選單與功能。",
     syncedPrefsNote:
       "時區、時間格式、顯示貨幣和截圖上限跟隨你的帳戶，在你登入的每部裝置上都一樣。語言和主題只留在這部裝置。",
     generalTitle: "一般",
@@ -764,6 +774,9 @@ const SETTINGS_LABELS: Record<AppLocale, Record<SettingsLabelKey, string>> = {
     users: "ユーザー",
     usersTitle: "ユーザー",
     usersDescription: "このサーバーにアカウントを持つすべての人。",
+    roles: "ロール",
+    rolesTitle: "ロールと権限",
+    rolesDescription: "アクセスロールを作成し、ユーザーが開けるメニューと機能を管理します。",
     syncedPrefsNote:
       "タイムゾーン、時刻表示、表示通貨、スクリーンショット上限はアカウントに従い、サインインしたすべてのデバイスに適用されます。言語とテーマはこのデバイスだけの設定です。",
     generalTitle: "一般",
@@ -969,6 +982,9 @@ const SETTINGS_LABELS: Record<AppLocale, Record<SettingsLabelKey, string>> = {
     users: "사용자",
     usersTitle: "사용자",
     usersDescription: "이 서버에 계정이 있는 모든 사람.",
+    roles: "역할",
+    rolesTitle: "역할 및 권한",
+    rolesDescription: "접근 역할을 만들고 사용자가 열 수 있는 메뉴와 기능을 관리합니다.",
     syncedPrefsNote:
       "시간대, 시간 형식, 표시 통화, 스크린샷 상한은 계정을 따라가며 로그인한 모든 기기에 적용됩니다. 언어와 테마는 이 기기에만 적용됩니다.",
     generalTitle: "일반",
@@ -1171,6 +1187,7 @@ export function settingsNavItems(locale: string): {
     [
       { id: "profile", key: "profile" },
       { id: "users", key: "users" },
+      { id: "roles", key: "roles" },
       { id: "general", key: "general" },
       { id: "shortcuts", key: "shortcuts" },
       { id: "accounts", key: "accounts" },
