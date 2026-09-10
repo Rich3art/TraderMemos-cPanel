@@ -356,6 +356,25 @@ func (p *PG) GetCommercialFeedSettings(ctx context.Context) (CommercialFeedSetti
 	}, nil
 }
 
+func (p *PG) GetSmtpSettings(ctx context.Context) (SmtpSetting, error) {
+	v, err := p.q.GetSmtpSettings(ctx)
+	if err != nil {
+		return SmtpSetting{}, err
+	}
+	return SmtpSetting{
+		ID:         int64(v.ID),
+		Enabled:    int64(v.Enabled),
+		Host:       v.Host,
+		Port:       int64(v.Port),
+		Encryption: v.Encryption,
+		Username:   v.Username,
+		Password:   v.Password,
+		FromEmail:  v.FromEmail,
+		FromName:   v.FromName,
+		UpdatedAt:  v.UpdatedAt,
+	}, nil
+}
+
 func (p *PG) GetEconomicCalendarAISettings(ctx context.Context) (EconomicCalendarAISetting, error) {
 	v, err := p.q.GetEconomicCalendarAISettings(ctx)
 	if err != nil {
@@ -827,6 +846,18 @@ func (p *PG) ListEnabledAlertSettings(ctx context.Context) ([]AlertSetting, erro
 		}
 		return out
 	}(), nil
+}
+
+func (p *PG) ListEmailTemplates(ctx context.Context) ([]EmailTemplate, error) {
+	v, err := p.q.ListEmailTemplates(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]EmailTemplate, len(v))
+	for i := range v {
+		out[i] = EmailTemplate(v[i])
+	}
+	return out, nil
 }
 
 func (p *PG) ListEnabledFlexSyncSettings(ctx context.Context) ([]FlexSyncSetting, error) {
@@ -1439,6 +1470,42 @@ func (p *PG) UpsertCommercialFeedSettings(ctx context.Context, arg UpsertCommerc
 		ApiKey:       v.ApiKey,
 		LicenseNote:  v.LicenseNote,
 		UpdatedAt:    v.UpdatedAt,
+	}, nil
+}
+
+func (p *PG) UpsertEmailTemplate(ctx context.Context, arg UpsertEmailTemplateParams) (EmailTemplate, error) {
+	v, err := p.q.UpsertEmailTemplate(ctx, storepg.UpsertEmailTemplateParams(arg))
+	if err != nil {
+		return EmailTemplate{}, err
+	}
+	return EmailTemplate(v), nil
+}
+
+func (p *PG) UpsertSmtpSettings(ctx context.Context, arg UpsertSmtpSettingsParams) (SmtpSetting, error) {
+	v, err := p.q.UpsertSmtpSettings(ctx, storepg.UpsertSmtpSettingsParams{
+		Enabled:    int32(arg.Enabled),
+		Host:       arg.Host,
+		Port:       int32(arg.Port),
+		Encryption: arg.Encryption,
+		Username:   arg.Username,
+		Password:   arg.Password,
+		FromEmail:  arg.FromEmail,
+		FromName:   arg.FromName,
+	})
+	if err != nil {
+		return SmtpSetting{}, err
+	}
+	return SmtpSetting{
+		ID:         int64(v.ID),
+		Enabled:    int64(v.Enabled),
+		Host:       v.Host,
+		Port:       int64(v.Port),
+		Encryption: v.Encryption,
+		Username:   v.Username,
+		Password:   v.Password,
+		FromEmail:  v.FromEmail,
+		FromName:   v.FromName,
+		UpdatedAt:  v.UpdatedAt,
 	}, nil
 }
 

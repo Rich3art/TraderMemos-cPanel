@@ -63,6 +63,41 @@ export interface CommercialFeedSettingsPut {
   api_key?: string;
 }
 
+export type SmtpEncryption = "none" | "starttls" | "tls";
+
+export interface SmtpSettings {
+  enabled: boolean;
+  host: string;
+  port: number;
+  encryption: SmtpEncryption;
+  username: string;
+  password_set: boolean;
+  password_hint?: string;
+  from_email: string;
+  from_name: string;
+  updated_at?: string;
+}
+
+export interface SmtpSettingsPut {
+  enabled: boolean;
+  host: string;
+  port: number;
+  encryption: SmtpEncryption;
+  username: string;
+  password?: string;
+  clear_password?: boolean;
+  from_email: string;
+  from_name: string;
+}
+
+export interface EmailTemplate {
+  key: string;
+  name: string;
+  subject: string;
+  body: string;
+  updated_at?: string;
+}
+
 export const settingsApi = {
   getRiskRules: () => apiFetch<RiskRules>("/settings/risk-rules"),
   putRiskRules: (body: RiskRules) =>
@@ -151,6 +186,23 @@ export const settingsApi = {
   putCommercialFeedSettings: (body: CommercialFeedSettingsPut) =>
     apiFetch<CommercialFeedSettings>("/settings/commercial-feed", {
       method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  getSmtpSettings: () => apiFetch<SmtpSettings>("/settings/email"),
+  putSmtpSettings: (body: SmtpSettingsPut) =>
+    apiFetch<SmtpSettings>("/settings/email", {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  listEmailTemplates: () => apiFetch<EmailTemplate[]>("/settings/email/templates"),
+  putEmailTemplate: (key: string, body: Pick<EmailTemplate, "name" | "subject" | "body">) =>
+    apiFetch<EmailTemplate>(`/settings/email/templates/${encodeURIComponent(key)}`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  testSmtpSettings: (body: { to_email: string }) =>
+    apiFetch<{ ok: boolean }>("/settings/email/test", {
+      method: "POST",
       body: JSON.stringify(body),
     }),
 };

@@ -1,0 +1,352 @@
+import { Mail, Send, ShieldCheck, TextCursorInput } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { FormInput, FormTextarea, PasswordInput } from "@/components/FormInput";
+import { FormSkeleton } from "@/components/skeletons/form-skeleton";
+import { Button } from "@/components/ui/button";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import type { EmailTemplate, SmtpEncryption } from "@/lib/api/settings";
+import {
+  useEmailTemplates,
+  useSaveEmailTemplate,
+  useSaveSmtpSettings,
+  useSmtpSettings,
+  useTestSmtpSettings,
+} from "@/lib/hooks/useEmailSettings";
+import {
+  SettingsCard,
+  SettingsCardNote,
+  SettingsCardRow,
+  SettingsSection,
+  SettingsToggle,
+} from "./settings-ui";
+
+const ENCRYPTION_OPTIONS: { value: SmtpEncryption; label: string }[] = [
+  { value: "starttls", label: "STARTTLS" },
+  { value: "tls", label: "TLS / SSL" },
+  { value: "none", label: "None" },
+];
+
+export function EmailTab() {
+  const smtp = useSmtpSettings();
+  const templates = useEmailTemplates();
+  const saveSmtp = useSaveSmtpSettings();
+  const testSmtp = useTestSmtpSettings();
+  const saveTemplate = useSaveEmailTemplate();
+
+  const [enabled, setEnabled] = useState(false);
+  const [host, setHost] = useState("");
+  const [port, setPort] = useState("587");
+  const [encryption, setEncryption] = useState<SmtpEncryption>("starttls");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [clearPassword, setClearPassword] = useState(false);
+  const [fromEmail, setFromEmail] = useState("");
+  const [fromName, setFromName] = useState("");
+  const [toEmail, setToEmail] = useState("");
+  const [smtpError, setSmtpError] = useState("");
+  const [smtpMessage, setSmtpMessage] = useState("");
+
+  const [selectedTemplateKey, setSelectedTemplateKey] = useState("");
+  const [templateName, setTemplateName] = useState("");
+  const [templateSubject, setTemplateSubject] = useState("");
+  const [templateBody, setTemplateBody] = useState("");
+  const [templateError, setTemplateError] = useState("");
+
+  useEffect(() => {
+    if (!smtp.data) return;
+    setEnabled(Boolean(smtp.data.enabled));
+    setHost(smtp.data.host || "");
+    setPort(String(smtp.data.port || 587));
+    setEncryption(smtp.data.encryption || "starttls");
+    setUsername(smtp.data.username || "");
+    setFromEmail(smtp.data.from_email || "");
+    setFromName(smtp.data.from_name || "");
+    setPassword("");
+    setClearPassword(false);
+  }, [smtp.data]);
+
+  useEffect(() => {
+    if (!templates.data?.length) return;
+    const current =
+      templates.data.find((template) => template.key === selectedTemplateKey) ?? templates.data[0];
+    setSelectedTemplateKey(current.key);
+    setTemplateName(current.name);
+    setTemplateSubject(current.subject);
+    setTemplateBody(current.body);
+  }, [templates.data, selectedTemplateKey]);
+
+  const selectedTemplate = useMemo<EmailTemplate | undefined>(
+    () => templates.data?.find((template) => template.key === selectedTemplateKey),
+    [templates.data, selectedTemplateKey],
+  );
+
+  async function handleSaveSmtp() {
+    setSmtpError("");
+    setSmtpMessage("");
+    try {
+      await saveSmtp.mutateAsync({
+        enabled,
+        host,
+        port: Number(port),
+        encryption,
+        username,
+        from_email: fromEmail,
+        from_name: fromName,
+        clear_password: clearPassword,
+        ...(password.trim() ? { password: password.trim() } : {}),
+      });
+      setPassword("");
+      setClearPassword(false);
+      setSmtpMessage("Email settings saved.");
+    } catch (err) {
+      setSmtpError(err instanceof Error ? err.message : "Could not save email settings.");
+    }
+  }
+
+  async function handleTestSmtp() {
+    setSmtpError("");
+    setSmtpMessage("");
+    try {
+      await testSmtp.mutateAsync({ to_email: toEmail });
+      setSmtpMessage("Test email sent.");
+    } catch (err) {
+      setSmtpError(err instanceof Error ? err.message : "Could not send test email.");
+    }
+  }
+
+  async function handleSaveTemplate() {
+    setTemplateError("");
+    if (!selectedTemplate) return;
+    try {
+      await saveTemplate.mutateAsync({
+        key: selectedTemplate.key,
+        name: templateName,
+        subject: templateSubject,
+        body: templateBody,
+      });
+    } catch (err) {
+      setTemplateError(err instanceof Error ? err.message : "Could not save email template.");
+    }
+  }
+
+  return (
+    <SettingsSection
+      title="Email"
+      footer="Configure SMTP delivery and editable templates for transactional emails."
+    >
+      {smtp.isPending && !smtp.data ? (
+        <SettingsCard title="SMTP server">
+          <FormSkeleton fields={5} />
+        </SettingsCard>
+      ) : smtp.isError || !smtp.data ? (
+        <SettingsCard title="SMTP server">
+          <SettingsCardNote tone="destructive">Failed to load email settings.</SettingsCardNote>
+        </SettingsCard>
+      ) : (
+        <SettingsCard
+          title="SMTP server"
+          description="Credentials are stored on the API server. The browser only sees whether a password is saved and a masked hint."
+        >
+          <SettingsCardRow
+            icon={Mail}
+            active={enabled}
+            label="SMTP email"
+            detail="Enable after host, sender and credentials are correct."
+          >
+            <SettingsToggle checked={enabled} onCheckedChange={setEnabled} />
+          </SettingsCardRow>
+          <div className="grid gap-3 px-5 py-3 md:grid-cols-[1fr_120px_180px]">
+            <label className="block text-[12px] font-medium text-foreground">
+              Host
+              <FormInput
+                className="mt-1"
+                value={host}
+                onChange={(event) => setHost(event.target.value)}
+                placeholder="smtp.example.com"
+              />
+            </label>
+            <label className="block text-[12px] font-medium text-foreground">
+              Port
+              <FormInput
+                className="mt-1"
+                value={port}
+                onChange={(event) => setPort(event.target.value)}
+                inputMode="numeric"
+              />
+            </label>
+            <label className="block text-[12px] font-medium text-foreground">
+              Encryption
+              <NativeSelect
+                value={encryption}
+                onChange={(event) => setEncryption(event.target.value as SmtpEncryption)}
+                wrapperClassName="mt-1 w-full"
+                className="w-full"
+              >
+                {ENCRYPTION_OPTIONS.map((option) => (
+                  <NativeSelectOption key={option.value} value={option.value}>
+                    {option.label}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+            </label>
+          </div>
+          <div className="grid gap-3 px-5 py-3 md:grid-cols-2">
+            <label className="block text-[12px] font-medium text-foreground">
+              Username
+              <FormInput
+                className="mt-1"
+                value={username}
+                onChange={(event) => setUsername(event.target.value)}
+                autoComplete="off"
+              />
+            </label>
+            <label className="block text-[12px] font-medium text-foreground">
+              Password
+              <PasswordInput
+                className="mt-1"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder={
+                  smtp.data.password_set
+                    ? `${smtp.data.password_hint || "Password saved"} - leave blank to keep`
+                    : "SMTP password"
+                }
+                autoComplete="new-password"
+              />
+            </label>
+          </div>
+          <div className="grid gap-3 px-5 py-3 md:grid-cols-2">
+            <label className="block text-[12px] font-medium text-foreground">
+              From email
+              <FormInput
+                className="mt-1"
+                value={fromEmail}
+                onChange={(event) => setFromEmail(event.target.value)}
+                placeholder="journal@example.com"
+              />
+            </label>
+            <label className="block text-[12px] font-medium text-foreground">
+              From name
+              <FormInput
+                className="mt-1"
+                value={fromName}
+                onChange={(event) => setFromName(event.target.value)}
+                placeholder="TraderMemo"
+              />
+            </label>
+          </div>
+          <SettingsCardRow
+            icon={ShieldCheck}
+            label="Secret handling"
+            detail="Leave the password blank to keep the saved value. Use clear only when you want to remove it."
+          >
+            <Button
+              type="button"
+              variant={clearPassword ? "destructive" : "outline"}
+              size="sm"
+              disabled={!smtp.data.password_set}
+              onClick={() => setClearPassword((next) => !next)}
+            >
+              {clearPassword ? "Will clear password" : "Clear saved password"}
+            </Button>
+            <Button type="button" onClick={handleSaveSmtp} disabled={saveSmtp.isPending}>
+              {saveSmtp.isPending ? "Saving..." : "Save SMTP"}
+            </Button>
+          </SettingsCardRow>
+          <SettingsCardRow
+            icon={Send}
+            label="Send test"
+            detail="Uses the saved SMTP settings and sends a plain text test email."
+          >
+            <FormInput
+              value={toEmail}
+              onChange={(event) => setToEmail(event.target.value)}
+              placeholder="you@example.com"
+              className="w-[220px]"
+            />
+            <Button type="button" variant="outline" onClick={handleTestSmtp} disabled={testSmtp.isPending}>
+              {testSmtp.isPending ? "Sending..." : "Send test"}
+            </Button>
+          </SettingsCardRow>
+          {smtpError ? <SettingsCardNote tone="destructive">{smtpError}</SettingsCardNote> : null}
+          {smtpMessage ? <SettingsCardNote>{smtpMessage}</SettingsCardNote> : null}
+        </SettingsCard>
+      )}
+
+      <SettingsCard
+        title="Email templates"
+        description="Templates are stored as plain text and support safe placeholder shortcodes such as {{user_name}}, {{site_name}}, {{reset_link}}, {{verification_link}}, {{period}}, and {{analytics_summary}}."
+      >
+        {templates.isPending && !templates.data ? (
+          <FormSkeleton fields={3} />
+        ) : templates.isError || !templates.data?.length ? (
+          <SettingsCardNote tone="destructive">Failed to load email templates.</SettingsCardNote>
+        ) : (
+          <>
+            <div className="grid gap-3 px-5 py-3 md:grid-cols-[220px_1fr]">
+              <label className="block text-[12px] font-medium text-foreground">
+                Template
+                <NativeSelect
+                  value={selectedTemplateKey}
+                  onChange={(event) => setSelectedTemplateKey(event.target.value)}
+                  wrapperClassName="mt-1 w-full"
+                  className="w-full"
+                >
+                  {templates.data.map((template) => (
+                    <NativeSelectOption key={template.key} value={template.key}>
+                      {template.name}
+                    </NativeSelectOption>
+                  ))}
+                </NativeSelect>
+              </label>
+              <label className="block text-[12px] font-medium text-foreground">
+                Subject
+                <FormInput
+                  className="mt-1"
+                  value={templateSubject}
+                  onChange={(event) => setTemplateSubject(event.target.value)}
+                />
+              </label>
+            </div>
+            <div className="px-5 py-3">
+              <label className="block text-[12px] font-medium text-foreground">
+                Template name
+                <FormInput
+                  className="mt-1"
+                  value={templateName}
+                  onChange={(event) => setTemplateName(event.target.value)}
+                />
+              </label>
+            </div>
+            <div className="px-5 py-3">
+              <label className="block text-[12px] font-medium text-foreground">
+                Body
+                <FormTextarea
+                  className="mt-1 min-h-[220px] font-mono text-[12px]"
+                  value={templateBody}
+                  onChange={(event) => setTemplateBody(event.target.value)}
+                />
+              </label>
+            </div>
+            <SettingsCardRow
+              icon={TextCursorInput}
+              label="Template format"
+              detail="Rich HTML is not sent from these templates yet; plain text is safer for transactional email."
+            >
+              <Button
+                type="button"
+                onClick={handleSaveTemplate}
+                disabled={saveTemplate.isPending || !selectedTemplate}
+              >
+                {saveTemplate.isPending ? "Saving..." : "Save template"}
+              </Button>
+            </SettingsCardRow>
+            {templateError ? (
+              <SettingsCardNote tone="destructive">{templateError}</SettingsCardNote>
+            ) : null}
+          </>
+        )}
+      </SettingsCard>
+    </SettingsSection>
+  );
+}

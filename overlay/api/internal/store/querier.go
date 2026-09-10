@@ -65,6 +65,7 @@ type Querier interface {
 	GetCoachSettings(ctx context.Context) (CoachSetting, error)
 	GetCommercialFeedSettings(ctx context.Context) (CommercialFeedSetting, error)
 	GetEconomicCalendarAISettings(ctx context.Context) (EconomicCalendarAISetting, error)
+	GetSmtpSettings(ctx context.Context) (SmtpSetting, error)
 	GetEconomicEventsLastFetch(ctx context.Context, provider string) (string, error)
 	GetExecution(ctx context.Context, arg GetExecutionParams) (Execution, error)
 	GetExecutionByDedup(ctx context.Context, arg GetExecutionByDedupParams) (Execution, error)
@@ -112,6 +113,7 @@ type Querier interface {
 	ListEnabledAlertChannels(ctx context.Context, userID string) ([]AlertChannel, error)
 	ListEnabledAlertSettings(ctx context.Context) ([]AlertSetting, error)
 	ListEnabledFlexSyncSettings(ctx context.Context) ([]FlexSyncSetting, error)
+	ListEmailTemplates(ctx context.Context) ([]EmailTemplate, error)
 	ListExecutionsForAccount(ctx context.Context, arg ListExecutionsForAccountParams) ([]Execution, error)
 	ListExecutionsForTrade(ctx context.Context, tradeID string) ([]Execution, error)
 	ListFeedbackByUser(ctx context.Context, userID string) ([]Feedback, error)
@@ -183,6 +185,8 @@ type Querier interface {
 	UpsertPsychologyQuestions(ctx context.Context, arg UpsertPsychologyQuestionsParams) (PsychologyQuestionSetting, error)
 	UpsertPropSettings(ctx context.Context, arg UpsertPropSettingsParams) (PropSetting, error)
 	UpsertRiskRules(ctx context.Context, arg UpsertRiskRulesParams) (RiskRule, error)
+	UpsertEmailTemplate(ctx context.Context, arg UpsertEmailTemplateParams) (EmailTemplate, error)
+	UpsertSmtpSettings(ctx context.Context, arg UpsertSmtpSettingsParams) (SmtpSetting, error)
 	UpsertTrade(ctx context.Context, arg UpsertTradeParams) error
 	UpsertTradeJournal(ctx context.Context, arg UpsertTradeJournalParams) error
 	UpsertUserPreferences(ctx context.Context, arg UpsertUserPreferencesParams) (UserPreference, error)

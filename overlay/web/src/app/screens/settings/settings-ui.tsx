@@ -41,6 +41,7 @@ export type SettingsSectionId =
   | "shortcuts"
   | "api"
   | "commercial-feed"
+  | "email"
   | "sharing"
   | "about";
 
