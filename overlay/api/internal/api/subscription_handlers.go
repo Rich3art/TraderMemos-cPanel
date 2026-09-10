@@ -78,6 +78,8 @@ func (s *Server) subscriptionRoutes(g *echo.Group) {
 	g.POST("/subscriptions/paypal/create-order", s.handleCreatePayPalOrder)
 	g.POST("/subscriptions/paypal/capture", s.handleCapturePayPalOrder)
 	g.POST("/subscriptions/whop/create-checkout", s.handleCreateWhopCheckout)
+	g.POST("/subscriptions/paystack/initialize", s.handleInitializePaystackTransaction)
+	g.POST("/subscriptions/paystack/verify/:reference", s.handleVerifyPaystackTransaction)
 }
 
 func (s *Server) publicSubscriptionRoutes(g *echo.Group) {

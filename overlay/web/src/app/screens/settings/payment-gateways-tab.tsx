@@ -3,9 +3,16 @@ import { CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/Skeleton";
-import type { PayPalGatewaySettingsPut, PayPalMode, WhopGatewaySettingsPut } from "@/lib/api/settings";
+import type {
+  PayPalGatewaySettingsPut,
+  PayPalMode,
+  PaystackGatewaySettingsPut,
+  WhopGatewaySettingsPut,
+} from "@/lib/api/settings";
 import {
+  usePaystackGatewaySettings,
   usePayPalGatewaySettings,
+  useUpdatePaystackGatewaySettings,
   useUpdatePayPalGatewaySettings,
   useUpdateWhopGatewaySettings,
   useWhopGatewaySettings,
@@ -29,19 +36,29 @@ const EMPTY_WHOP: WhopGatewaySettingsPut = {
   webhook_secret: "",
 };
 
+const EMPTY_PAYSTACK: PaystackGatewaySettingsPut = {
+  enabled: false,
+  public_key: "",
+  secret_key: "",
+};
+
 export function PaymentGatewaysTab() {
   const me = useMe();
   const isOwner = Boolean(me.data?.is_admin);
   const paypal = usePayPalGatewaySettings(isOwner);
   const whop = useWhopGatewaySettings(isOwner);
+  const paystack = usePaystackGatewaySettings(isOwner);
   const savePayPal = useUpdatePayPalGatewaySettings();
   const saveWhop = useUpdateWhopGatewaySettings();
+  const savePaystack = useUpdatePaystackGatewaySettings();
   const [form, setForm] = useState<PayPalGatewaySettingsPut>(EMPTY);
   const [clearSecret, setClearSecret] = useState(false);
   const [clearWebhook, setClearWebhook] = useState(false);
   const [whopForm, setWhopForm] = useState<WhopGatewaySettingsPut>(EMPTY_WHOP);
   const [clearWhopKey, setClearWhopKey] = useState(false);
   const [clearWhopSecret, setClearWhopSecret] = useState(false);
+  const [paystackForm, setPaystackForm] = useState<PaystackGatewaySettingsPut>(EMPTY_PAYSTACK);
+  const [clearPaystackSecret, setClearPaystackSecret] = useState(false);
 
   useEffect(() => {
     if (!paypal.data) return;
@@ -69,7 +86,17 @@ export function PaymentGatewaysTab() {
     setClearWhopSecret(false);
   }, [whop.data]);
 
-  if (me.isLoading || paypal.isLoading || whop.isLoading) return <Skeleton className="h-40 w-full" />;
+  useEffect(() => {
+    if (!paystack.data) return;
+    setPaystackForm({
+      enabled: paystack.data.enabled,
+      public_key: paystack.data.public_key,
+      secret_key: "",
+    });
+    setClearPaystackSecret(false);
+  }, [paystack.data]);
+
+  if (me.isLoading || paypal.isLoading || whop.isLoading || paystack.isLoading) return <Skeleton className="h-40 w-full" />;
   if (!isOwner) {
     return (
       <SettingsSection title="Payment gateways" description="Only an owner can manage payment providers.">
@@ -281,6 +308,74 @@ export function PaymentGatewaysTab() {
               }
             >
               Save Whop
+            </Button>
+          </div>
+        </div>
+        <div className="grid gap-4 border-t border-border px-5 py-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2 font-medium">
+              <CreditCard size={16} strokeWidth={1.75} />
+              Paystack
+            </div>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={paystackForm.enabled}
+                onChange={(event) =>
+                  setPaystackForm((prev) => ({ ...prev, enabled: event.target.checked }))
+                }
+              />
+              Enabled
+            </label>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <Input
+              value={paystackForm.public_key}
+              placeholder="Paystack public key, e.g. pk_live_..."
+              maxLength={300}
+              onChange={(event) =>
+                setPaystackForm((prev) => ({ ...prev, public_key: event.target.value }))
+              }
+            />
+            <div className="grid gap-1">
+              <Input
+                type="password"
+                value={paystackForm.secret_key ?? ""}
+                placeholder={
+                  paystack.data?.secret_key_set
+                    ? `Secret key is set (${paystack.data.secret_key_hint})`
+                    : "Paystack secret key, e.g. sk_live_..."
+                }
+                onChange={(event) =>
+                  setPaystackForm((prev) => ({ ...prev, secret_key: event.target.value }))
+                }
+              />
+              <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={clearPaystackSecret}
+                  onChange={(event) => setClearPaystackSecret(event.target.checked)}
+                />
+                Clear saved secret key
+              </label>
+            </div>
+          </div>
+          <div className="rounded-lg border border-border bg-muted/25 p-3 text-sm text-muted-foreground">
+            Webhook URL: <span className="font-mono text-foreground">https://journal.ranksmedia.com/api/v1/public/webhooks/paystack</span>
+          </div>
+          <div className="flex justify-end">
+            <Button
+              type="button"
+              loading={savePaystack.isPending}
+              disabled={(!paystackForm.public_key.trim() || !paystackForm.secret_key?.trim()) && paystackForm.enabled && !paystack.data?.secret_key_set}
+              onClick={() =>
+                void savePaystack.mutateAsync({
+                  ...paystackForm,
+                  clear_secret_key: clearPaystackSecret,
+                })
+              }
+            >
+              Save Paystack
             </Button>
           </div>
         </div>

@@ -163,6 +163,21 @@ export interface WhopGatewaySettingsPut {
   clear_webhook_secret?: boolean;
 }
 
+export interface PaystackGatewaySettings {
+  enabled: boolean;
+  public_key: string;
+  secret_key_set: boolean;
+  secret_key_hint?: string;
+  updated_at?: string;
+}
+
+export interface PaystackGatewaySettingsPut {
+  enabled: boolean;
+  public_key: string;
+  secret_key?: string;
+  clear_secret_key?: boolean;
+}
+
 export const settingsApi = {
   getRiskRules: () => apiFetch<RiskRules>("/settings/risk-rules"),
   putRiskRules: (body: RiskRules) =>
@@ -295,6 +310,13 @@ export const settingsApi = {
     apiFetch<WhopGatewaySettings>("/settings/payment-gateways/whop"),
   putWhopGatewaySettings: (body: WhopGatewaySettingsPut) =>
     apiFetch<WhopGatewaySettings>("/settings/payment-gateways/whop", {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  getPaystackGatewaySettings: () =>
+    apiFetch<PaystackGatewaySettings>("/settings/payment-gateways/paystack"),
+  putPaystackGatewaySettings: (body: PaystackGatewaySettingsPut) =>
+    apiFetch<PaystackGatewaySettings>("/settings/payment-gateways/paystack", {
       method: "PUT",
       body: JSON.stringify(body),
     }),

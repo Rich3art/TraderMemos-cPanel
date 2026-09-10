@@ -92,3 +92,21 @@ export function useCreateWhopCheckout() {
       subscriptionsApi.createWhopCheckout(body),
   });
 }
+
+export function useInitializePaystack() {
+  return useMutation({
+    mutationFn: (body: { package_id: string; email?: string; callback_url?: string }) =>
+      subscriptionsApi.initializePaystack(body),
+  });
+}
+
+export function useVerifyPaystack() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (reference: string) => subscriptionsApi.verifyPaystack(reference),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: RECORDS_KEY });
+      void qc.invalidateQueries({ queryKey: ["admin", "user-roles"] });
+    },
+  });
+}

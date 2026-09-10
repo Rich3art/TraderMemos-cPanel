@@ -57,6 +57,13 @@ export interface WhopCheckout {
   purchase_url: string;
 }
 
+export interface PaystackInitialize {
+  authorization_url: string;
+  access_code: string;
+  reference: string;
+  public_key: string;
+}
+
 export const subscriptionsApi = {
   listPackages: () => apiFetch<SubscriptionPackage[]>("/admin/subscriptions/packages"),
   createPackage: (body: SubscriptionPackageBody) =>
@@ -95,5 +102,14 @@ export const subscriptionsApi = {
     apiFetch<WhopCheckout>("/subscriptions/whop/create-checkout", {
       method: "POST",
       body: JSON.stringify(body),
+    }),
+  initializePaystack: (body: { package_id: string; email?: string; callback_url?: string }) =>
+    apiFetch<PaystackInitialize>("/subscriptions/paystack/initialize", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  verifyPaystack: (reference: string) =>
+    apiFetch<UserSubscription>(`/subscriptions/paystack/verify/${encodeURIComponent(reference)}`, {
+      method: "POST",
     }),
 };

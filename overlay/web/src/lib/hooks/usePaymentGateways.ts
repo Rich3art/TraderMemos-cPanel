@@ -2,11 +2,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   settingsApi,
   type PayPalGatewaySettingsPut,
+  type PaystackGatewaySettingsPut,
   type WhopGatewaySettingsPut,
 } from "@/lib/api/settings";
 
 const paypalGatewayKey = ["settings", "payment-gateways", "paypal"] as const;
 const whopGatewayKey = ["settings", "payment-gateways", "whop"] as const;
+const paystackGatewayKey = ["settings", "payment-gateways", "paystack"] as const;
 
 export function usePayPalGatewaySettings(enabled = true) {
   return useQuery({
@@ -37,5 +39,22 @@ export function useUpdateWhopGatewaySettings() {
   return useMutation({
     mutationFn: (body: WhopGatewaySettingsPut) => settingsApi.putWhopGatewaySettings(body),
     onSuccess: (data) => qc.setQueryData(whopGatewayKey, data),
+  });
+}
+
+export function usePaystackGatewaySettings(enabled = true) {
+  return useQuery({
+    queryKey: paystackGatewayKey,
+    queryFn: () => settingsApi.getPaystackGatewaySettings(),
+    enabled,
+  });
+}
+
+export function useUpdatePaystackGatewaySettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: PaystackGatewaySettingsPut) =>
+      settingsApi.putPaystackGatewaySettings(body),
+    onSuccess: (data) => qc.setQueryData(paystackGatewayKey, data),
   });
 }
