@@ -74,8 +74,25 @@ func TestComplianceDailyDrawdownFromPeak(t *testing.T) {
 	if rep.Days[0].DailyDrawdown != 250 {
 		t.Fatalf("daily drawdown=%v, want 250", rep.Days[0].DailyDrawdown)
 	}
+	if rep.MaxDailyDrawdown != 250 || rep.MaxDrawdown != 250 {
+		t.Fatalf("maxDailyDrawdown=%v maxDrawdown=%v, want 250/250", rep.MaxDailyDrawdown, rep.MaxDrawdown)
+	}
 	if rep.DrawdownBreaches != 1 || rep.BreachPnl != 150 {
 		t.Fatalf("breaches=%d breachPnl=%v", rep.DrawdownBreaches, rep.BreachPnl)
+	}
+}
+
+func TestComplianceMaxDrawdownSpansDays(t *testing.T) {
+	rules := ComplianceRules{MaxDailyLoss: 999999}
+	trades := []ComplianceTrade{
+		ct(1, 10, 500, 0),
+		ct(2, 10, -150, 0),
+		ct(3, 10, -200, 0),
+		ct(4, 10, 100, 0),
+	}
+	rep := Compliance(trades, rules, time.UTC)
+	if rep.MaxDrawdown != 350 {
+		t.Fatalf("maxDrawdown=%v, want 350", rep.MaxDrawdown)
 	}
 }
 

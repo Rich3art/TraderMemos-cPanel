@@ -42,6 +42,8 @@ export interface ComplianceReport {
   drawdown_breaches: number;
   trade_limit_breaches: number;
   loss_streak_breaches: number;
+  max_daily_drawdown: number;
+  max_drawdown: number;
 }
 
 /** One trade flagged by a behavioral detector, with the evidence. */

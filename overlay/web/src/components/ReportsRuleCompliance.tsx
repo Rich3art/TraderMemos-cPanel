@@ -59,6 +59,7 @@ export function ReportsRuleCompliance({ report, loading, error }: ReportsRuleCom
 
   const breachDays = report.days.filter((d) => !d.compliant);
   const recentBreaches = breachDays.slice(-6).reverse();
+  const recentDays = report.days.slice(-8).reverse();
   const scoredDays = report.compliant_days + report.breach_days;
   const adherence = scoredDays > 0 ? (report.compliant_days / scoredDays) * 100 : null;
 
@@ -68,7 +69,7 @@ export function ReportsRuleCompliance({ report, loading, error }: ReportsRuleCom
       description="Days scored against your risk rules — following them should show up in the P&L split."
     >
       <div className="flex flex-col gap-5">
-        <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-6">
           <StatCard
             label="Adherence"
             value={adherence != null ? `${adherence.toFixed(0)}%` : "—"}
@@ -83,6 +84,18 @@ export function ReportsRuleCompliance({ report, loading, error }: ReportsRuleCom
             label="P&L, rules broken"
             value={money.format(report.breach_pnl)}
             accent={report.breach_pnl >= 0 ? "pos" : "neg"}
+          />
+          <StatCard
+            label="Worst daily DD"
+            value={money.format(-Math.abs(report.max_daily_drawdown ?? 0))}
+            accent={(report.max_daily_drawdown ?? 0) > 0 ? "neg" : "none"}
+            hint="worst intraday day"
+          />
+          <StatCard
+            label="Max drawdown"
+            value={money.format(-Math.abs(report.max_drawdown ?? 0))}
+            accent={(report.max_drawdown ?? 0) > 0 ? "neg" : "none"}
+            hint="filtered period"
           />
           <StatCard
             label="Violations"
@@ -149,6 +162,60 @@ export function ReportsRuleCompliance({ report, loading, error }: ReportsRuleCom
                 </li>
               ))}
             </ul>
+          </div>
+        )}
+
+        {recentDays.length > 0 && (
+          <div className="flex flex-col gap-1.5">
+            <p className="m-0 text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
+              Daily drawdown
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[520px] border-separate border-spacing-0 text-[12px]">
+                <thead>
+                  <tr className="text-left text-muted-foreground">
+                    <th className="px-2 py-1 font-medium">Day</th>
+                    <th className="px-2 py-1 text-right font-medium">Trades</th>
+                    <th className="px-2 py-1 text-right font-medium">Net P&L</th>
+                    <th className="px-2 py-1 text-right font-medium">Daily drawdown</th>
+                    <th className="px-2 py-1 text-right font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentDays.map((d) => (
+                    <tr key={d.date} className="border-t border-border/40">
+                      <td className="px-2 py-1.5 tabular-nums text-foreground">
+                        {fmtDayShort(`${d.date}T12:00:00Z`, locale)}
+                      </td>
+                      <td className="px-2 py-1.5 text-right tabular-nums text-muted-foreground">
+                        {d.trades}
+                      </td>
+                      <td
+                        className={
+                          d.net_pnl >= 0
+                            ? "px-2 py-1.5 text-right tabular-nums font-medium text-profit"
+                            : "px-2 py-1.5 text-right tabular-nums font-medium text-destructive"
+                        }
+                      >
+                        {money.format(d.net_pnl)}
+                      </td>
+                      <td className="px-2 py-1.5 text-right tabular-nums font-medium text-destructive">
+                        {money.format(-Math.abs(d.daily_drawdown ?? 0))}
+                      </td>
+                      <td className="px-2 py-1.5 text-right">
+                        {d.drawdown_breach ? (
+                          <Pill tone="neg">drawdown breach</Pill>
+                        ) : d.compliant ? (
+                          <Pill tone="pos">clean</Pill>
+                        ) : (
+                          <Pill tone="muted">other breach</Pill>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>

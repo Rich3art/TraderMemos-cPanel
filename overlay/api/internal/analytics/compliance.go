@@ -58,6 +58,8 @@ type ComplianceReport struct {
 	DrawdownBreaches   int             `json:"drawdown_breaches"`
 	TradeLimitBreaches int             `json:"trade_limit_breaches"`
 	LossStreakBreaches int             `json:"loss_streak_breaches"`
+	MaxDailyDrawdown   float64         `json:"max_daily_drawdown"`
+	MaxDrawdown        float64         `json:"max_drawdown"`
 }
 
 // Compliance scores closed trades against the rules, day by day in loc.
@@ -90,6 +92,8 @@ func Compliance(trades []ComplianceTrade, rules ComplianceRules, loc *time.Locat
 	dayPeak := make(map[string]float64)
 	// Consecutive losing closes so far in each day.
 	streak := make(map[string]int)
+	totalRunning := 0.0
+	totalPeak := 0.0
 	var order []string
 	for _, t := range sorted {
 		key := t.ClosedAt.In(loc).Format("2006-01-02")
@@ -101,6 +105,13 @@ func Compliance(trades []ComplianceTrade, rules ComplianceRules, loc *time.Locat
 		}
 		d.Trades++
 		d.NetPnl += t.NetPnl
+		totalRunning += t.NetPnl
+		if totalRunning > totalPeak {
+			totalPeak = totalRunning
+		}
+		if drawdown := totalPeak - totalRunning; drawdown > rep.MaxDrawdown {
+			rep.MaxDrawdown = drawdown
+		}
 		if rules.MaxTradesPerDay > 0 && d.Trades > rules.MaxTradesPerDay {
 			d.TradeLimitBreach = true
 		}
@@ -158,6 +169,9 @@ func Compliance(trades []ComplianceTrade, rules ComplianceRules, loc *time.Locat
 		}
 		if d.DrawdownBreach {
 			rep.DrawdownBreaches++
+		}
+		if d.DailyDrawdown > rep.MaxDailyDrawdown {
+			rep.MaxDailyDrawdown = d.DailyDrawdown
 		}
 		if d.TradeLimitBreach {
 			rep.TradeLimitBreaches++
