@@ -362,6 +362,8 @@ func requiredPermission(c *echo.Context) string {
 		return "users.manage"
 	case strings.HasPrefix(path, "/api/v1/admin/subscription"):
 		return "subscriptions.manage"
+	case strings.HasPrefix(path, "/api/v1/settings/payment-gateways"):
+		return "payments.manage"
 	case strings.HasPrefix(path, "/api/v1/accounts"):
 		if write {
 			return "accounts.manage"

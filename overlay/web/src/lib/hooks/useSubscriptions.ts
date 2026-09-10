@@ -67,3 +67,21 @@ export function useGrantSubscription() {
     },
   });
 }
+
+export function useCreatePayPalOrder() {
+  return useMutation({
+    mutationFn: (body: { package_id: string; return_url?: string; cancel_url?: string }) =>
+      subscriptionsApi.createPayPalOrder(body),
+  });
+}
+
+export function useCapturePayPalOrder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (orderID: string) => subscriptionsApi.capturePayPalOrder(orderID),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: RECORDS_KEY });
+      void qc.invalidateQueries({ queryKey: ["admin", "user-roles"] });
+    },
+  });
+}

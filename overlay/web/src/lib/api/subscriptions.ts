@@ -44,6 +44,13 @@ export interface UserSubscription {
   updated_at: string;
 }
 
+export interface PayPalOrder {
+  order_id: string;
+  status: string;
+  approve_url: string;
+  links: { href: string; rel: string }[];
+}
+
 export const subscriptionsApi = {
   listPackages: () => apiFetch<SubscriptionPackage[]>("/admin/subscriptions/packages"),
   createPackage: (body: SubscriptionPackageBody) =>
@@ -68,4 +75,14 @@ export const subscriptionsApi = {
     }),
   getPublicPackage: (slug: string) =>
     apiFetch<SubscriptionPackage>(`/public/packages/${encodeURIComponent(slug)}`),
+  createPayPalOrder: (body: { package_id: string; return_url?: string; cancel_url?: string }) =>
+    apiFetch<PayPalOrder>("/subscriptions/paypal/create-order", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  capturePayPalOrder: (order_id: string) =>
+    apiFetch<UserSubscription>("/subscriptions/paypal/capture", {
+      method: "POST",
+      body: JSON.stringify({ order_id }),
+    }),
 };

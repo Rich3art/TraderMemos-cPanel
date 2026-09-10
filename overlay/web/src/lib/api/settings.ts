@@ -119,6 +119,29 @@ export interface DailyJournalReminderSettings {
   updated_at?: string;
 }
 
+export type PayPalMode = "sandbox" | "live";
+
+export interface PayPalGatewaySettings {
+  enabled: boolean;
+  mode: PayPalMode;
+  client_id: string;
+  client_secret_set: boolean;
+  client_secret_hint?: string;
+  webhook_id_set: boolean;
+  webhook_id_hint?: string;
+  updated_at?: string;
+}
+
+export interface PayPalGatewaySettingsPut {
+  enabled: boolean;
+  mode: PayPalMode;
+  client_id: string;
+  client_secret?: string;
+  clear_client_secret?: boolean;
+  webhook_id?: string;
+  clear_webhook_id?: boolean;
+}
+
 export const settingsApi = {
   getRiskRules: () => apiFetch<RiskRules>("/settings/risk-rules"),
   putRiskRules: (body: RiskRules) =>
@@ -237,6 +260,13 @@ export const settingsApi = {
     apiFetch<DailyJournalReminderSettings>("/settings/daily-journal-reminder"),
   putDailyJournalReminderSettings: (body: DailyJournalReminderSettings) =>
     apiFetch<DailyJournalReminderSettings>("/settings/daily-journal-reminder", {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  getPayPalGatewaySettings: () =>
+    apiFetch<PayPalGatewaySettings>("/settings/payment-gateways/paypal"),
+  putPayPalGatewaySettings: (body: PayPalGatewaySettingsPut) =>
+    apiFetch<PayPalGatewaySettings>("/settings/payment-gateways/paypal", {
       method: "PUT",
       body: JSON.stringify(body),
     }),

@@ -5,6 +5,7 @@ import {
   Link2,
   Mail,
   BadgeDollarSign,
+  CreditCard,
   DatabaseZap,
   Shield,
   ShieldCheck,
@@ -27,6 +28,7 @@ import { AlertsSection } from "./settings/alerts-section";
 import { ApiTab } from "./settings/api-tab";
 import { CommercialFeedTab } from "./settings/commercial-feed-tab";
 import { EmailTab } from "./settings/email-tab";
+import { PaymentGatewaysTab } from "./settings/payment-gateways-tab";
 import { RolesTab } from "./settings/roles-tab";
 import { SharingTab } from "./settings/sharing-tab";
 import { SubscriptionsTab } from "./settings/subscriptions-tab";
@@ -115,6 +117,7 @@ const NAV_ICONS: Record<SettingsSectionId, typeof Wallet> = {
   api: KeyRound,
   "commercial-feed": DatabaseZap,
   email: Mail,
+  "payment-gateways": CreditCard,
   subscriptions: BadgeDollarSign,
   sharing: Link2,
   about: Github,
@@ -132,6 +135,7 @@ export function SettingsView(props: SettingsViewProps) {
     .filter((item) => item.id !== "users" || (me.data?.is_admin ?? false))
     .filter((item) => item.id !== "roles" || (me.data?.is_admin ?? false))
     .filter((item) => item.id !== "email" || (me.data?.is_admin ?? false))
+    .filter((item) => item.id !== "payment-gateways" || (me.data?.is_admin ?? false))
     .filter((item) => item.id !== "subscriptions" || (me.data?.is_admin ?? false))
     .map((item) => ({
       ...item,
@@ -197,6 +201,7 @@ export function SettingsView(props: SettingsViewProps) {
         {section === "api" && <ApiTab />}
         {section === "commercial-feed" && <CommercialFeedTab />}
         {section === "email" && <EmailTab />}
+        {section === "payment-gateways" && <PaymentGatewaysTab />}
         {section === "subscriptions" && <SubscriptionsTab />}
         {section === "sharing" && <SharingTab />}
         {section === "about" && <AboutTab />}

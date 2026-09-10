@@ -153,6 +153,7 @@ export type SettingsSectionId =
   | "api"
   | "commercial-feed"
   | "email"
+  | "payment-gateways"
   | "subscriptions"
   | "sharing"
   | "about";
@@ -177,6 +178,7 @@ export type SettingsLabelKey =
   | "api"
   | "commercial-feed"
   | "email"
+  | "payment-gateways"
   | "subscriptions"
   | "about"
   | "accountsTitle"
@@ -195,6 +197,8 @@ export type SettingsLabelKey =
   | "commercial-feedDescription"
   | "emailTitle"
   | "emailDescription"
+  | "payment-gatewaysTitle"
+  | "payment-gatewaysDescription"
   | "subscriptionsTitle"
   | "subscriptionsDescription"
   | "sharing"
@@ -358,6 +362,7 @@ const SETTINGS_LABELS: Record<AppLocale, Record<SettingsLabelKey, string>> = {
       api: "API",
       "commercial-feed": "Commercial Feed",
       email: "Email",
+      "payment-gateways": "Payment Gateways",
       subscriptions: "Subscriptions",
       about: "About",
     accountsTitle: "Accounts & funding",
@@ -388,6 +393,8 @@ const SETTINGS_LABELS: Record<AppLocale, Record<SettingsLabelKey, string>> = {
       "Choose the News feed source and prepare paid commercial feed credentials for later integration.",
     emailTitle: "Email",
     emailDescription: "SMTP delivery settings and transactional email templates.",
+    "payment-gatewaysTitle": "Payment Gateways",
+    "payment-gatewaysDescription": "Configure PayPal and future payment providers for subscription packages.",
     subscriptionsTitle: "Subscriptions",
     subscriptionsDescription: "Create access packages and public subscription links.",
     sharing: "Sharing",
@@ -568,9 +575,10 @@ const SETTINGS_LABELS: Record<AppLocale, Record<SettingsLabelKey, string>> = {
     general: "一般",
     shortcuts: "快捷鍵",
     api: "API",
-    "commercial-feed": "Commercial Feed",
-    email: "Email",
-    subscriptions: "Subscriptions",
+      "commercial-feed": "Commercial Feed",
+      email: "Email",
+      "payment-gateways": "Payment Gateways",
+      subscriptions: "Subscriptions",
     about: "關於",
     accountsTitle: "帳戶與資金",
     accountsDescription: "管理券商帳戶、起始結餘及現金流。",
@@ -600,6 +608,8 @@ const SETTINGS_LABELS: Record<AppLocale, Record<SettingsLabelKey, string>> = {
       "Choose the News feed source and prepare paid commercial feed credentials for later integration.",
     emailTitle: "Email",
     emailDescription: "SMTP delivery settings and transactional email templates.",
+    "payment-gatewaysTitle": "Payment Gateways",
+    "payment-gatewaysDescription": "Configure PayPal and future payment providers for subscription packages.",
     subscriptionsTitle: "Subscriptions",
     subscriptionsDescription: "Create access packages and public subscription links.",
     sharing: "分享",
@@ -767,9 +777,10 @@ const SETTINGS_LABELS: Record<AppLocale, Record<SettingsLabelKey, string>> = {
     general: "一般",
     shortcuts: "ショートカット",
     api: "API",
-    "commercial-feed": "Commercial Feed",
-    email: "Email",
-    subscriptions: "Subscriptions",
+      "commercial-feed": "Commercial Feed",
+      email: "Email",
+      "payment-gateways": "Payment Gateways",
+      subscriptions: "Subscriptions",
     about: "について",
     accountsTitle: "アカウントと資金",
     accountsDescription: "証券会社アカウント、開始残高、キャッシュフローを管理します。",
@@ -800,6 +811,8 @@ const SETTINGS_LABELS: Record<AppLocale, Record<SettingsLabelKey, string>> = {
       "Choose the News feed source and prepare paid commercial feed credentials for later integration.",
     emailTitle: "Email",
     emailDescription: "SMTP delivery settings and transactional email templates.",
+    "payment-gatewaysTitle": "Payment Gateways",
+    "payment-gatewaysDescription": "Configure PayPal and future payment providers for subscription packages.",
     subscriptionsTitle: "Subscriptions",
     subscriptionsDescription: "Create access packages and public subscription links.",
     sharing: "共有",
@@ -978,9 +991,10 @@ const SETTINGS_LABELS: Record<AppLocale, Record<SettingsLabelKey, string>> = {
     general: "일반",
     shortcuts: "단축키",
     api: "API",
-    "commercial-feed": "Commercial Feed",
-    email: "Email",
-    subscriptions: "Subscriptions",
+      "commercial-feed": "Commercial Feed",
+      email: "Email",
+      "payment-gateways": "Payment Gateways",
+      subscriptions: "Subscriptions",
     about: "정보",
     accountsTitle: "계정 및 자금",
     accountsDescription: "브로커 계정, 시작 잔액, 현금 흐름을 관리합니다.",
@@ -1010,6 +1024,8 @@ const SETTINGS_LABELS: Record<AppLocale, Record<SettingsLabelKey, string>> = {
       "Choose the News feed source and prepare paid commercial feed credentials for later integration.",
     emailTitle: "Email",
     emailDescription: "SMTP delivery settings and transactional email templates.",
+    "payment-gatewaysTitle": "Payment Gateways",
+    "payment-gatewaysDescription": "Configure PayPal and future payment providers for subscription packages.",
     subscriptionsTitle: "Subscriptions",
     subscriptionsDescription: "Create access packages and public subscription links.",
     sharing: "공유",
@@ -1213,6 +1229,7 @@ export function settingsNavItems(locale: string): {
       { id: "api", key: "api" },
       { id: "commercial-feed", key: "commercial-feed" },
       { id: "email", key: "email" },
+      { id: "payment-gateways", key: "payment-gateways" },
       { id: "subscriptions", key: "subscriptions" },
       { id: "sharing", key: "sharing" },
       { id: "about", key: "about" },

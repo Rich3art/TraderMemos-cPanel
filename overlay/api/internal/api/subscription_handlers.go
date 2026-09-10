@@ -75,6 +75,8 @@ func (s *Server) subscriptionRoutes(g *echo.Group) {
 	admin.DELETE("/packages/:id", s.handleAdminDeleteSubscriptionPackage)
 	admin.GET("/records", s.handleAdminListUserSubscriptions)
 	admin.POST("/grant", s.handleAdminGrantSubscription)
+	g.POST("/subscriptions/paypal/create-order", s.handleCreatePayPalOrder)
+	g.POST("/subscriptions/paypal/capture", s.handleCapturePayPalOrder)
 }
 
 func (s *Server) publicSubscriptionRoutes(g *echo.Group) {

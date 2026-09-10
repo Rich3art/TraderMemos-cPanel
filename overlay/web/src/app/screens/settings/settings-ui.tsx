@@ -43,6 +43,7 @@ export type SettingsSectionId =
   | "api"
   | "commercial-feed"
   | "email"
+  | "payment-gateways"
   | "subscriptions"
   | "sharing"
   | "about";

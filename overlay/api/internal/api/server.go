@@ -210,6 +210,7 @@ func (s *Server) routes() {
 	}
 	s.publicShareRoutes(public)
 	s.publicSubscriptionRoutes(public)
+	s.publicPayPalRoutes(public)
 
 	protected := v1.Group("")
 	if s.deps.JWT != nil {
@@ -245,5 +246,6 @@ func (s *Server) routes() {
 	s.adminRoutes(protected)
 	s.roleRoutes(protected)
 	s.subscriptionRoutes(protected)
+	s.paypalGatewayRoutes(protected)
 	s.preferenceRoutes(protected)
 }
