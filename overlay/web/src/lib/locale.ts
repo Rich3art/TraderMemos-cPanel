@@ -187,6 +187,10 @@ export type SettingsLabelKey =
   | "sharingLinksDescription"
   | "sharingCreate"
   | "sharingCreateHint"
+  | "sharingPublicWarningTitle"
+  | "sharingPublicWarningBody"
+  | "sharingAcknowledgePublic"
+  | "sharingNeverExpiresWarning"
   | "sharingCreateFailed"
   | "sharingGenerate"
   | "sharingLinkReady"
@@ -369,6 +373,13 @@ const SETTINGS_LABELS: Record<AppLocale, Record<SettingsLabelKey, string>> = {
     sharingCreate: "New share link",
     sharingCreateHint:
       "The link shows aggregate stats only. Money amounts stay hidden unless you turn them on.",
+    sharingPublicWarningTitle: "Public link.",
+    sharingPublicWarningBody:
+      "Anyone who has this URL can view the shared performance summary until it expires or you revoke it.",
+    sharingAcknowledgePublic:
+      "I understand this creates a public-by-link page and that money amounts are visible if I enable them.",
+    sharingNeverExpiresWarning:
+      "Never-expiring links stay accessible until you revoke them manually.",
     sharingCreateFailed: "Could not create the share link",
     sharingGenerate: "Create link",
     sharingLinkReady: "Share link ready",
@@ -564,6 +575,10 @@ const SETTINGS_LABELS: Record<AppLocale, Record<SettingsLabelKey, string>> = {
       "可隨時撤銷嘅公開連結，只顯示整體績效統計。唔會公開任何交易、筆記或帳戶資料。",
     sharingCreate: "新增分享連結",
     sharingCreateHint: "連結只會顯示整體統計。除非你開啟，否則唔會顯示金額。",
+    sharingPublicWarningTitle: "公開連結。",
+    sharingPublicWarningBody: "任何持有此網址的人都可以查看分享的績效摘要，直到連結到期或被撤銷。",
+    sharingAcknowledgePublic: "我明白這會建立公開連結頁面；如果開啟金額，金額也會可見。",
+    sharingNeverExpiresWarning: "永不到期的連結會一直可存取，直到你手動撤銷。",
     sharingCreateFailed: "無法建立分享連結",
     sharingGenerate: "建立連結",
     sharingLinkReady: "分享連結已就緒",
@@ -751,6 +766,13 @@ const SETTINGS_LABELS: Record<AppLocale, Record<SettingsLabelKey, string>> = {
       "いつでも取り消せる公開リンクで、集計された成績のみを表示します。取引・メモ・口座情報は公開されません。",
     sharingCreate: "共有リンクを作成",
     sharingCreateHint: "リンクには集計値のみが表示されます。オンにしない限り金額は表示されません。",
+    sharingPublicWarningTitle: "公開リンク。",
+    sharingPublicWarningBody:
+      "この URL を知っている人は、有効期限切れまたは取り消しまで共有された成績概要を閲覧できます。",
+    sharingAcknowledgePublic:
+      "これはリンクを知っている人が見られる公開ページで、金額表示を有効にすると金額も表示されることを理解しました。",
+    sharingNeverExpiresWarning:
+      "無期限リンクは、手動で取り消すまでアクセス可能なままになります。",
     sharingCreateFailed: "共有リンクを作成できませんでした",
     sharingGenerate: "リンクを作成",
     sharingLinkReady: "共有リンクの準備ができました",
@@ -945,6 +967,12 @@ const SETTINGS_LABELS: Record<AppLocale, Record<SettingsLabelKey, string>> = {
       "언제든 철회할 수 있는 공개 링크로, 집계된 성과만 표시됩니다. 거래·메모·계좌 정보는 공개되지 않습니다.",
     sharingCreate: "새 공유 링크",
     sharingCreateHint: "링크에는 집계 통계만 표시됩니다. 켜지 않는 한 금액은 표시되지 않습니다.",
+    sharingPublicWarningTitle: "공개 링크.",
+    sharingPublicWarningBody:
+      "이 URL을 가진 사람은 만료되거나 철회될 때까지 공유된 성과 요약을 볼 수 있습니다.",
+    sharingAcknowledgePublic:
+      "이 링크가 공개 링크 페이지를 만들며, 금액 표시를 켜면 금액도 보인다는 것을 이해합니다.",
+    sharingNeverExpiresWarning: "만료되지 않는 링크는 직접 철회할 때까지 계속 접근 가능합니다.",
     sharingCreateFailed: "공유 링크를 만들 수 없습니다",
     sharingGenerate: "링크 만들기",
     sharingLinkReady: "공유 링크 준비 완료",
