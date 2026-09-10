@@ -142,6 +142,27 @@ export interface PayPalGatewaySettingsPut {
   clear_webhook_id?: boolean;
 }
 
+export interface WhopGatewaySettings {
+  enabled: boolean;
+  mode: PayPalMode;
+  account_id: string;
+  api_key_set: boolean;
+  api_key_hint?: string;
+  webhook_secret_set: boolean;
+  webhook_secret_hint?: string;
+  updated_at?: string;
+}
+
+export interface WhopGatewaySettingsPut {
+  enabled: boolean;
+  mode: PayPalMode;
+  account_id: string;
+  api_key?: string;
+  clear_api_key?: boolean;
+  webhook_secret?: string;
+  clear_webhook_secret?: boolean;
+}
+
 export const settingsApi = {
   getRiskRules: () => apiFetch<RiskRules>("/settings/risk-rules"),
   putRiskRules: (body: RiskRules) =>
@@ -267,6 +288,13 @@ export const settingsApi = {
     apiFetch<PayPalGatewaySettings>("/settings/payment-gateways/paypal"),
   putPayPalGatewaySettings: (body: PayPalGatewaySettingsPut) =>
     apiFetch<PayPalGatewaySettings>("/settings/payment-gateways/paypal", {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  getWhopGatewaySettings: () =>
+    apiFetch<WhopGatewaySettings>("/settings/payment-gateways/whop"),
+  putWhopGatewaySettings: (body: WhopGatewaySettingsPut) =>
+    apiFetch<WhopGatewaySettings>("/settings/payment-gateways/whop", {
       method: "PUT",
       body: JSON.stringify(body),
     }),

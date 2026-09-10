@@ -51,6 +51,12 @@ export interface PayPalOrder {
   links: { href: string; rel: string }[];
 }
 
+export interface WhopCheckout {
+  checkout_id: string;
+  plan_id: string;
+  purchase_url: string;
+}
+
 export const subscriptionsApi = {
   listPackages: () => apiFetch<SubscriptionPackage[]>("/admin/subscriptions/packages"),
   createPackage: (body: SubscriptionPackageBody) =>
@@ -84,5 +90,10 @@ export const subscriptionsApi = {
     apiFetch<UserSubscription>("/subscriptions/paypal/capture", {
       method: "POST",
       body: JSON.stringify({ order_id }),
+    }),
+  createWhopCheckout: (body: { package_id: string; redirect_url?: string }) =>
+    apiFetch<WhopCheckout>("/subscriptions/whop/create-checkout", {
+      method: "POST",
+      body: JSON.stringify(body),
     }),
 };

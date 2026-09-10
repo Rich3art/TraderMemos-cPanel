@@ -85,3 +85,10 @@ export function useCapturePayPalOrder() {
     },
   });
 }
+
+export function useCreateWhopCheckout() {
+  return useMutation({
+    mutationFn: (body: { package_id: string; redirect_url?: string }) =>
+      subscriptionsApi.createWhopCheckout(body),
+  });
+}

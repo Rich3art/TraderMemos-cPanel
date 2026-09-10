@@ -77,6 +77,7 @@ func (s *Server) subscriptionRoutes(g *echo.Group) {
 	admin.POST("/grant", s.handleAdminGrantSubscription)
 	g.POST("/subscriptions/paypal/create-order", s.handleCreatePayPalOrder)
 	g.POST("/subscriptions/paypal/capture", s.handleCapturePayPalOrder)
+	g.POST("/subscriptions/whop/create-checkout", s.handleCreateWhopCheckout)
 }
 
 func (s *Server) publicSubscriptionRoutes(g *echo.Group) {
