@@ -213,6 +213,7 @@ func (s *Server) routes() {
 	s.publicPayPalRoutes(public)
 	s.publicWhopRoutes(public)
 	s.publicPaystackRoutes(public)
+	s.publicStripeRoutes(public)
 
 	protected := v1.Group("")
 	if s.deps.JWT != nil {
@@ -251,5 +252,6 @@ func (s *Server) routes() {
 	s.paypalGatewayRoutes(protected)
 	s.whopGatewayRoutes(protected)
 	s.paystackGatewayRoutes(protected)
+	s.stripeGatewayRoutes(protected)
 	s.preferenceRoutes(protected)
 }
