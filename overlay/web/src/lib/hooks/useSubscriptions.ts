@@ -110,3 +110,21 @@ export function useVerifyPaystack() {
     },
   });
 }
+
+export function useCreateStripeCheckoutSession() {
+  return useMutation({
+    mutationFn: (body: { package_id: string; success_url?: string; cancel_url?: string }) =>
+      subscriptionsApi.createStripeCheckoutSession(body),
+  });
+}
+
+export function useVerifyStripeCheckoutSession() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (sessionID: string) => subscriptionsApi.verifyStripeCheckoutSession(sessionID),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: RECORDS_KEY });
+      void qc.invalidateQueries({ queryKey: ["admin", "user-roles"] });
+    },
+  });
+}
