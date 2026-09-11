@@ -28,6 +28,7 @@ vi.mock("../../components/charts/TradeChart", () => ({
     tradeChartSpy(props);
     return <div data-testid="setup-symbol-chart" />;
   },
+  readStoredChartDrawings: () => () => [],
 }));
 
 vi.mock("../../lib/hooks/useMarketBars", () => ({
@@ -140,7 +141,9 @@ describe("NewSetupDrawer", () => {
     await userEvent.type(screen.getByLabelText("Target"), "120000");
     await userEvent.type(screen.getByLabelText("Stop"), "98000");
 
-    expect(screen.getByTestId("setup-symbol-chart")).toBeInTheDocument();
+    expect(screen.queryByTestId("setup-symbol-chart")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /load chart/i }));
+    expect(await screen.findByTestId("setup-symbol-chart")).toBeInTheDocument();
     expect(tradeChartSpy).toHaveBeenLastCalledWith(
       expect.objectContaining({
         symbol: "BTCUSDT",
