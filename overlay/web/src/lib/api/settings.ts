@@ -178,6 +178,27 @@ export interface PaystackGatewaySettingsPut {
   clear_secret_key?: boolean;
 }
 
+export interface StripeGatewaySettings {
+  enabled: boolean;
+  mode: PayPalMode;
+  publishable_key: string;
+  secret_key_set: boolean;
+  secret_key_hint?: string;
+  webhook_secret_set: boolean;
+  webhook_secret_hint?: string;
+  updated_at?: string;
+}
+
+export interface StripeGatewaySettingsPut {
+  enabled: boolean;
+  mode: PayPalMode;
+  publishable_key: string;
+  secret_key?: string;
+  clear_secret_key?: boolean;
+  webhook_secret?: string;
+  clear_webhook_secret?: boolean;
+}
+
 export const settingsApi = {
   getRiskRules: () => apiFetch<RiskRules>("/settings/risk-rules"),
   putRiskRules: (body: RiskRules) =>
@@ -317,6 +338,13 @@ export const settingsApi = {
     apiFetch<PaystackGatewaySettings>("/settings/payment-gateways/paystack"),
   putPaystackGatewaySettings: (body: PaystackGatewaySettingsPut) =>
     apiFetch<PaystackGatewaySettings>("/settings/payment-gateways/paystack", {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  getStripeGatewaySettings: () =>
+    apiFetch<StripeGatewaySettings>("/settings/payment-gateways/stripe"),
+  putStripeGatewaySettings: (body: StripeGatewaySettingsPut) =>
+    apiFetch<StripeGatewaySettings>("/settings/payment-gateways/stripe", {
       method: "PUT",
       body: JSON.stringify(body),
     }),
