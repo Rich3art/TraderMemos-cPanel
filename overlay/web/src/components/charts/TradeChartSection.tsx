@@ -9,6 +9,7 @@ import {
 } from "@/lib/hooks/useMarketBars";
 import { intlLocale } from "@/lib/locale";
 import { Modal } from "@/components/Modal";
+import { Button } from "@/components/ui/button";
 import { ReplayControls } from "./ReplayControls";
 import { ReplayHeartbeat } from "./ReplayHeartbeat";
 import {
@@ -35,6 +36,7 @@ export function TradeChartSection({ trade }: { trade: TradeDetail }) {
   );
   const [expanded, setExpanded] = useState(false);
   const [expandedHeight, setExpandedHeight] = useState(480);
+  const [chartLoaded, setChartLoaded] = useState(false);
 
   const chartable = isChartableSymbol(trade.symbol);
   const barsQ = useMarketBars({
@@ -43,16 +45,16 @@ export function TradeChartSection({ trade }: { trade: TradeDetail }) {
     from: range.from,
     to: range.to,
     interval,
-    enabled: chartable,
+    enabled: chartable && chartLoaded,
   });
 
   const showUnavailable = !chartable;
-  const showEmpty = chartable && !barsQ.isLoading && (barsQ.data?.bars.length ?? 0) === 0;
-  const canExpand = chartable && !showUnavailable;
+  const showEmpty = chartLoaded && chartable && !barsQ.isLoading && (barsQ.data?.bars.length ?? 0) === 0;
+  const canExpand = chartLoaded && chartable && !showUnavailable;
 
-  const bars = barsQ.data?.bars;
+  const bars = chartLoaded ? barsQ.data?.bars : undefined;
   const replay = useReplayController(bars?.length ?? 0);
-  const canReplay = chartable && !showEmpty && (bars?.length ?? 0) > 1;
+  const canReplay = chartLoaded && chartable && !showEmpty && (bars?.length ?? 0) > 1;
   const cursorBar = replay.active ? bars?.[replay.cursor] : undefined;
   const replayUpTo = cursorBar && bars ? replayCutoff(bars, replay.cursor, interval) : null;
   const replayPnl = useMemo(
@@ -64,6 +66,19 @@ export function TradeChartSection({ trade }: { trade: TradeDetail }) {
     () => (replay.active && bars ? detectFillBarMismatch(trade.fills, bars, interval) : false),
     [replay.active, bars, trade.fills, interval],
   );
+
+  useEffect(() => {
+    setChartLoaded(false);
+    setExpanded(false);
+    replay.exit();
+  }, [trade.id, trade.symbol]);
+
+  function handleIntervalChange(next: BarInterval) {
+    setChartLoaded(false);
+    setExpanded(false);
+    replay.exit();
+    setInterval(next);
+  }
 
   useEffect(() => {
     if (!expanded) return;
@@ -79,21 +94,23 @@ export function TradeChartSection({ trade }: { trade: TradeDetail }) {
     symbol: trade.symbol,
     bars,
     fills: trade.fills,
-    loading: barsQ.isLoading,
-    error: barsQ.isError,
+    loading: chartLoaded && barsQ.isLoading,
+    error: chartLoaded && barsQ.isError,
     errorMessage: showUnavailable
       ? "Chart unavailable for this symbol."
-      : showEmpty
-        ? "No market data for this window."
-        : barsQ.error instanceof Error
-          ? barsQ.error.message
-          : undefined,
+      : !chartLoaded
+        ? "Click Load chart to fetch market data."
+        : showEmpty
+          ? "No market data for this window."
+          : barsQ.error instanceof Error
+            ? barsQ.error.message
+            : undefined,
     targetPrice: trade.target_price,
     stopPrice: trade.stop_price,
     entryPrice: trade.avg_entry_price,
     interval,
-    onIntervalChange: setInterval,
-    empty: showUnavailable || showEmpty,
+    onIntervalChange: handleIntervalChange,
+    empty: showUnavailable || !chartLoaded || showEmpty,
     hideIntervalWhenEmpty: showUnavailable,
     replayUpTo,
     replayActive: replay.active,
@@ -119,7 +136,23 @@ export function TradeChartSection({ trade }: { trade: TradeDetail }) {
 
   return (
     <div className="flex flex-col gap-3 px-4 pb-4">
-      <TradeChart {...chartProps} onExpand={canExpand ? () => setExpanded(true) : undefined} />
+      {!chartLoaded ? (
+        <div className="rounded-lg border border-border bg-card p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-medium text-foreground">Market chart</div>
+              <div className="mt-1 text-xs text-muted-foreground">
+                {showUnavailable ? "Chart unavailable for this symbol." : "Load market data when you need the chart."}
+              </div>
+            </div>
+            <Button size="sm" variant="soft" disabled={!chartable} onClick={() => setChartLoaded(true)}>
+              Load chart
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <TradeChart {...chartProps} onExpand={canExpand ? () => setExpanded(true) : undefined} />
+      )}
       {!expanded && replayControls}
       <Modal
         open={expanded}
