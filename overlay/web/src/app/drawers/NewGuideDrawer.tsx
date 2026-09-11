@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Bot, Check, ChevronLeft, ChevronRight, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Drawer,
   DrawerBody,
@@ -73,6 +73,7 @@ export function NewGuideDrawer() {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [analysisDataLoaded, setAnalysisDataLoaded] = useState(false);
 
   const selectedSetup = setups.find((s) => s.id === setupId);
   const inferredMarket = inferMarketFromSymbol(symbol);
@@ -89,7 +90,7 @@ export function NewGuideDrawer() {
     from: chartFrom,
     to: chartTo,
     interval: tf.primary,
-    enabled: open && step >= 3 && symbol.trim().length > 0,
+    enabled: open && step >= 3 && analysisDataLoaded && symbol.trim().length > 0,
   });
   const analysis = useMemo(
     () =>
@@ -103,6 +104,10 @@ export function NewGuideDrawer() {
       }),
     [barsQ.data?.bars, expectation, inferredMarket, selectedSetup?.name, side, symbol],
   );
+
+  useEffect(() => {
+    setAnalysisDataLoaded(false);
+  }, [open, symbol, tf.primary]);
 
   const current: GuideStep = STEPS[step]!;
   const effectiveAccountId = accountId || accounts[0]?.id || "";
@@ -132,6 +137,7 @@ export function NewGuideDrawer() {
     setAnswers({});
     setError("");
     setSaving(false);
+    setAnalysisDataLoaded(false);
   }
 
   function close() {
@@ -368,12 +374,23 @@ export function NewGuideDrawer() {
                 <input className={fieldClass()} value={expectation} onChange={(e) => setExpectation(e.target.value)} placeholder="Example: 3 to 5 days" />
               </label>
               <div className="rounded-lg border border-border bg-muted/30 p-4 text-sm">
-                <div className="mb-2 flex items-center gap-2 font-medium"><Bot size={16} /> Guide analysis</div>
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 font-medium"><Bot size={16} /> Guide analysis</div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="soft"
+                    disabled={!symbol.trim()}
+                    onClick={() => setAnalysisDataLoaded(true)}
+                  >
+                    Load data
+                  </Button>
+                </div>
                 <p className="whitespace-pre-line text-muted-foreground">{analysis.summary}</p>
                 <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-3">
                   <span>Main: {labelTimeframe(analysis.primaryTimeframe)}</span>
                   <span>Higher: {labelTimeframe(analysis.higherTimeframe)}</span>
-                  <span>Bars: {barsQ.data?.bars.length ?? 0}</span>
+                  <span>Bars: {analysisDataLoaded ? (barsQ.data?.bars.length ?? 0) : "not loaded"}</span>
                 </div>
               </div>
             </section>
