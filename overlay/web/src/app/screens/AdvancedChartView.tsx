@@ -35,6 +35,7 @@ export function AdvancedChartView({
   onIntervalChange,
 }: AdvancedChartViewProps) {
   const [input, setInput] = useState(symbol);
+  const [loadedSpec, setLoadedSpec] = useState<{ symbol: string; interval: BarInterval } | null>(null);
   useEffect(() => setInput(symbol), [symbol]);
 
   // Snapped to the minute so query keys stay stable across renders.
@@ -44,18 +45,27 @@ export function AdvancedChartView({
     return { from: snapChartTime(from.toISOString()), to: snapChartTime(to.toISOString()) };
   }, [interval]);
 
+  const chartRequested = loadedSpec?.symbol === symbol && loadedSpec.interval === interval;
   const barsQ = useMarketBars({
     symbol,
     instrument_type: inferMarketFromSymbol(symbol),
     from: range.from,
     to: range.to,
     interval,
-    enabled: symbol.length > 0,
+    enabled: symbol.length > 0 && chartRequested,
   });
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
-    onSymbolChange(input.trim().toUpperCase());
+    const nextSymbol = input.trim().toUpperCase();
+    if (!nextSymbol) return;
+    setLoadedSpec({ symbol: nextSymbol, interval });
+    onSymbolChange(nextSymbol);
+  }
+
+  function handleIntervalChange(next: BarInterval) {
+    setLoadedSpec(null);
+    onIntervalChange(next);
   }
 
   return (
@@ -86,20 +96,30 @@ export function AdvancedChartView({
 
         {symbol ? (
           <section className="rounded-lg bg-card p-4">
-            <TradeChart
-              symbol={symbol}
-              bars={barsQ.data?.bars}
-              fills={[]}
-              loading={barsQ.isLoading}
-              error={barsQ.isError}
-              errorMessage={barsQ.error instanceof Error ? barsQ.error.message : undefined}
-              interval={interval}
-              onIntervalChange={onIntervalChange}
-              height={480}
-              hideHeaderLabel
-              drawingTools
-              annotationScope={{ entityType: "analysis", entityId: symbol }}
-            />
+            {chartRequested ? (
+              <TradeChart
+                symbol={symbol}
+                bars={barsQ.data?.bars}
+                fills={[]}
+                loading={barsQ.isLoading}
+                error={barsQ.isError}
+                errorMessage={barsQ.error instanceof Error ? barsQ.error.message : undefined}
+                interval={interval}
+                onIntervalChange={handleIntervalChange}
+                height={480}
+                hideHeaderLabel
+                drawingTools
+                annotationScope={{ entityType: "analysis", entityId: symbol }}
+              />
+            ) : (
+              <div className="flex h-[480px] flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/20 px-4 text-center">
+                <ChartLine className="mb-3 size-7 text-muted-foreground" aria-hidden />
+                <div className="text-sm font-medium text-foreground">Chart not loaded</div>
+                <div className="mt-1 max-w-sm text-xs text-muted-foreground">
+                  Click Load to fetch market data and open the drawing chart.
+                </div>
+              </div>
+            )}
           </section>
         ) : (
           <EmptyState
