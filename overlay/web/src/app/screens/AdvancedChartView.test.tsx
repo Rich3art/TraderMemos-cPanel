@@ -62,7 +62,7 @@ describe("AdvancedChartView", () => {
     expect(onSymbolChange).toHaveBeenCalledWith("NVDA");
   });
 
-  it("renders the chart for the routed symbol and interval", () => {
+  it("does not auto-load the routed symbol", () => {
     render(
       <AdvancedChartView
         symbol="NVDA"
@@ -71,7 +71,7 @@ describe("AdvancedChartView", () => {
         onIntervalChange={noop}
       />,
     );
-    expect(screen.getByTestId("chart")).toHaveTextContent("NVDA:15:draw");
+    expect(screen.queryByTestId("chart")).not.toBeInTheDocument();
     const call = useMarketBarsMock.mock.calls.at(-1)?.[0] as {
       enabled: boolean;
       symbol: string;
@@ -79,6 +79,24 @@ describe("AdvancedChartView", () => {
     };
     expect(call.symbol).toBe("NVDA");
     expect(call.instrument_type).toBe("stock");
+    expect(call.enabled).toBe(false);
+  });
+
+  it("loads the routed symbol after clicking Load", async () => {
+    render(
+      <AdvancedChartView
+        symbol="NVDA"
+        interval="15"
+        onSymbolChange={noop}
+        onIntervalChange={noop}
+      />,
+    );
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Load" }));
+    expect(screen.getByTestId("chart")).toHaveTextContent("NVDA:15:draw");
+    const call = useMarketBarsMock.mock.calls.at(-1)?.[0] as {
+      enabled: boolean;
+    };
     expect(call.enabled).toBe(true);
   });
 
