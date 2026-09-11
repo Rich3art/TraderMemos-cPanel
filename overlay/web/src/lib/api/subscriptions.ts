@@ -64,6 +64,12 @@ export interface PaystackInitialize {
   public_key: string;
 }
 
+export interface StripeCheckoutSession {
+  session_id: string;
+  checkout_url: string;
+  publishable_key: string;
+}
+
 export const subscriptionsApi = {
   listPackages: () => apiFetch<SubscriptionPackage[]>("/admin/subscriptions/packages"),
   createPackage: (body: SubscriptionPackageBody) =>
@@ -110,6 +116,15 @@ export const subscriptionsApi = {
     }),
   verifyPaystack: (reference: string) =>
     apiFetch<UserSubscription>(`/subscriptions/paystack/verify/${encodeURIComponent(reference)}`, {
+      method: "POST",
+    }),
+  createStripeCheckoutSession: (body: { package_id: string; success_url?: string; cancel_url?: string }) =>
+    apiFetch<StripeCheckoutSession>("/subscriptions/stripe/create-checkout-session", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  verifyStripeCheckoutSession: (sessionID: string) =>
+    apiFetch<UserSubscription>(`/subscriptions/stripe/verify/${encodeURIComponent(sessionID)}`, {
       method: "POST",
     }),
 };
