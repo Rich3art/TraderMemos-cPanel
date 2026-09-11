@@ -7,13 +7,16 @@ import type {
   PayPalGatewaySettingsPut,
   PayPalMode,
   PaystackGatewaySettingsPut,
+  StripeGatewaySettingsPut,
   WhopGatewaySettingsPut,
 } from "@/lib/api/settings";
 import {
   usePaystackGatewaySettings,
   usePayPalGatewaySettings,
+  useStripeGatewaySettings,
   useUpdatePaystackGatewaySettings,
   useUpdatePayPalGatewaySettings,
+  useUpdateStripeGatewaySettings,
   useUpdateWhopGatewaySettings,
   useWhopGatewaySettings,
 } from "@/lib/hooks/usePaymentGateways";
@@ -42,15 +45,25 @@ const EMPTY_PAYSTACK: PaystackGatewaySettingsPut = {
   secret_key: "",
 };
 
+const EMPTY_STRIPE: StripeGatewaySettingsPut = {
+  enabled: false,
+  mode: "sandbox",
+  publishable_key: "",
+  secret_key: "",
+  webhook_secret: "",
+};
+
 export function PaymentGatewaysTab() {
   const me = useMe();
   const isOwner = Boolean(me.data?.is_admin);
   const paypal = usePayPalGatewaySettings(isOwner);
   const whop = useWhopGatewaySettings(isOwner);
   const paystack = usePaystackGatewaySettings(isOwner);
+  const stripe = useStripeGatewaySettings(isOwner);
   const savePayPal = useUpdatePayPalGatewaySettings();
   const saveWhop = useUpdateWhopGatewaySettings();
   const savePaystack = useUpdatePaystackGatewaySettings();
+  const saveStripe = useUpdateStripeGatewaySettings();
   const [form, setForm] = useState<PayPalGatewaySettingsPut>(EMPTY);
   const [clearSecret, setClearSecret] = useState(false);
   const [clearWebhook, setClearWebhook] = useState(false);
@@ -59,6 +72,9 @@ export function PaymentGatewaysTab() {
   const [clearWhopSecret, setClearWhopSecret] = useState(false);
   const [paystackForm, setPaystackForm] = useState<PaystackGatewaySettingsPut>(EMPTY_PAYSTACK);
   const [clearPaystackSecret, setClearPaystackSecret] = useState(false);
+  const [stripeForm, setStripeForm] = useState<StripeGatewaySettingsPut>(EMPTY_STRIPE);
+  const [clearStripeSecret, setClearStripeSecret] = useState(false);
+  const [clearStripeWebhookSecret, setClearStripeWebhookSecret] = useState(false);
 
   useEffect(() => {
     if (!paypal.data) return;
@@ -96,7 +112,20 @@ export function PaymentGatewaysTab() {
     setClearPaystackSecret(false);
   }, [paystack.data]);
 
-  if (me.isLoading || paypal.isLoading || whop.isLoading || paystack.isLoading) return <Skeleton className="h-40 w-full" />;
+  useEffect(() => {
+    if (!stripe.data) return;
+    setStripeForm({
+      enabled: stripe.data.enabled,
+      mode: stripe.data.mode,
+      publishable_key: stripe.data.publishable_key,
+      secret_key: "",
+      webhook_secret: "",
+    });
+    setClearStripeSecret(false);
+    setClearStripeWebhookSecret(false);
+  }, [stripe.data]);
+
+  if (me.isLoading || paypal.isLoading || whop.isLoading || paystack.isLoading || stripe.isLoading) return <Skeleton className="h-40 w-full" />;
   if (!isOwner) {
     return (
       <SettingsSection title="Payment gateways" description="Only an owner can manage payment providers.">
@@ -376,6 +405,107 @@ export function PaymentGatewaysTab() {
               }
             >
               Save Paystack
+            </Button>
+          </div>
+        </div>
+        <div className="grid gap-4 border-t border-border px-5 py-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2 font-medium">
+              <CreditCard size={16} strokeWidth={1.75} />
+              Stripe
+            </div>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={stripeForm.enabled}
+                onChange={(event) =>
+                  setStripeForm((prev) => ({ ...prev, enabled: event.target.checked }))
+                }
+              />
+              Enabled
+            </label>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <select
+              className="h-10 rounded-lg border border-input bg-background px-3 text-sm"
+              value={stripeForm.mode}
+              onChange={(event) =>
+                setStripeForm((prev) => ({ ...prev, mode: event.target.value as PayPalMode }))
+              }
+            >
+              <option value="sandbox">Sandbox</option>
+              <option value="live">Live</option>
+            </select>
+            <Input
+              value={stripeForm.publishable_key}
+              placeholder="Stripe publishable key, e.g. pk_live_..."
+              maxLength={300}
+              onChange={(event) =>
+                setStripeForm((prev) => ({ ...prev, publishable_key: event.target.value }))
+              }
+            />
+            <div className="grid gap-1">
+              <Input
+                type="password"
+                value={stripeForm.secret_key ?? ""}
+                placeholder={
+                  stripe.data?.secret_key_set
+                    ? `Secret key is set (${stripe.data.secret_key_hint})`
+                    : "Stripe secret key, e.g. sk_live_..."
+                }
+                onChange={(event) =>
+                  setStripeForm((prev) => ({ ...prev, secret_key: event.target.value }))
+                }
+              />
+              <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={clearStripeSecret}
+                  onChange={(event) => setClearStripeSecret(event.target.checked)}
+                />
+                Clear saved secret key
+              </label>
+            </div>
+            <div className="grid gap-1">
+              <Input
+                type="password"
+                value={stripeForm.webhook_secret ?? ""}
+                placeholder={
+                  stripe.data?.webhook_secret_set
+                    ? `Webhook secret is set (${stripe.data.webhook_secret_hint})`
+                    : "Stripe webhook secret, e.g. whsec_..."
+                }
+                onChange={(event) =>
+                  setStripeForm((prev) => ({ ...prev, webhook_secret: event.target.value }))
+                }
+              />
+              <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={clearStripeWebhookSecret}
+                  onChange={(event) => setClearStripeWebhookSecret(event.target.checked)}
+                />
+                Clear saved webhook secret
+              </label>
+            </div>
+          </div>
+          <div className="rounded-lg border border-border bg-muted/25 p-3 text-sm text-muted-foreground">
+            Webhook URL: <span className="font-mono text-foreground">https://journal.ranksmedia.com/api/v1/public/webhooks/stripe</span>
+          </div>
+          <div className="flex justify-end">
+            <Button
+              type="button"
+              loading={saveStripe.isPending}
+              disabled={(!stripeForm.publishable_key.trim() || !stripeForm.secret_key?.trim()) && stripeForm.enabled && !stripe.data?.secret_key_set}
+              onClick={() =>
+                void saveStripe.mutateAsync({
+                  ...stripeForm,
+                  clear_secret_key: clearStripeSecret,
+                  clear_webhook_secret: clearStripeWebhookSecret,
+                })
+              }
+            >
+              Save Stripe
             </Button>
           </div>
         </div>
