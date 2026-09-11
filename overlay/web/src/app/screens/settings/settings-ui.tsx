@@ -46,6 +46,7 @@ export type SettingsSectionId =
   | "payment-gateways"
   | "subscriptions"
   | "sharing"
+  | "privacy"
   | "about";
 
 export function SettingsShell({ nav, children }: { nav: ReactNode; children: ReactNode }) {

@@ -1,9 +1,12 @@
 package api
 
 import (
+	"database/sql"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/labstack/echo/v5"
@@ -19,6 +22,8 @@ func (s *Server) meRoutes(g *echo.Group) {
 	g.POST("/me/totp/start", s.handleTotpStart)
 	g.POST("/me/totp/confirm", s.handleTotpConfirm)
 	g.POST("/me/totp/disable", s.handleTotpDisable)
+	g.GET("/me/privacy/export", s.handlePrivacyExport)
+	g.DELETE("/me/privacy", s.handlePrivacyDelete)
 }
 
 type meDTO struct {
@@ -160,4 +165,261 @@ func (s *Server) handleTotpDisable(c *echo.Context) error {
 		return Fail(http.StatusInternalServerError, "internal", "could not disable", nil)
 	}
 	return c.NoContent(http.StatusNoContent)
+}
+
+type privacyExportDTO struct {
+	ExportedAt time.Time                   `json:"exported_at"`
+	User       map[string]any              `json:"user"`
+	Data       map[string][]map[string]any `json:"data"`
+}
+
+type privacyDeleteReq struct {
+	Confirmation string `json:"confirmation"`
+}
+
+var privacyExportTables = []string{
+	"accounts",
+	"import_batches",
+	"executions",
+	"trades",
+	"cash_transactions",
+	"tags",
+	"setups",
+	"trade_journal",
+	"trade_attachments",
+	"journal_notes",
+	"media_files",
+	"annual_goals",
+	"prop_settings",
+	"flex_sync_settings",
+	"post_exit_excursion",
+	"user_preferences",
+	"alert_settings",
+	"alert_channels",
+	"alert_events",
+	"coach_reviews",
+	"setup_attachments",
+	"psychology_questions",
+	"risk_rules",
+	"chart_annotations",
+	"feedback",
+	"analytics_email_settings",
+	"daily_journal_reminders",
+	"user_subscriptions",
+}
+
+func (s *Server) handlePrivacyExport(c *echo.Context) error {
+	if s.deps.DB == nil {
+		return contentDBUnavailable()
+	}
+	uid := auth.UserID(c)
+	user, err := s.exportCurrentUser(c, uid)
+	if err != nil {
+		return err
+	}
+	data := map[string][]map[string]any{}
+	for _, table := range privacyExportTables {
+		rows, err := s.exportTableByUser(c, table, uid)
+		if err != nil {
+			return err
+		}
+		data[table] = rows
+	}
+	if rows, err := s.exportAccessTokenMetadata(c, uid); err != nil {
+		return err
+	} else {
+		data["access_tokens"] = rows
+	}
+	if rows, err := s.exportPaymentTransactions(c, uid); err != nil {
+		return err
+	} else {
+		data["payment_transactions"] = rows
+	}
+	c.Response().Header().Set(echo.HeaderContentDisposition, `attachment; filename="tradermemos-my-data.json"`)
+	return c.JSON(http.StatusOK, privacyExportDTO{
+		ExportedAt: time.Now().UTC(),
+		User:       user,
+		Data:       data,
+	})
+}
+
+func (s *Server) handlePrivacyDelete(c *echo.Context) error {
+	if s.deps.DB == nil {
+		return contentDBUnavailable()
+	}
+	var in privacyDeleteReq
+	if err := c.Bind(&in); err != nil {
+		return Fail(http.StatusBadRequest, "bad_request", "invalid body", nil)
+	}
+	if strings.TrimSpace(in.Confirmation) != "DELETE" {
+		return Fail(http.StatusBadRequest, "bad_request", `type "DELETE" to confirm account deletion`, nil)
+	}
+	uid := auth.UserID(c)
+	if err := s.ensureUserCanSelfDelete(c, uid); err != nil {
+		return err
+	}
+	keys, err := s.collectUserStorageKeys(c, uid)
+	if err != nil {
+		return err
+	}
+	tx, err := s.deps.DB.BeginTx(c.Request().Context(), nil)
+	if err != nil {
+		return Fail(http.StatusInternalServerError, "internal", "could not start deletion", nil)
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(c.Request().Context(), s.contentSQL(`
+		UPDATE payment_transactions
+		SET user_id = NULL, buyer_label = 'Deleted User', raw_json = '{}', updated_at = CURRENT_TIMESTAMP
+		WHERE user_id = ?
+	`), uid); err != nil && !isMissingPrivacyTable(err) {
+		return Fail(http.StatusInternalServerError, "internal", "could not anonymize payment records", nil)
+	}
+	if _, err := tx.ExecContext(c.Request().Context(), s.contentSQL(`DELETE FROM users WHERE id = ?`), uid); err != nil {
+		return Fail(http.StatusInternalServerError, "internal", "could not delete account", nil)
+	}
+	if err := tx.Commit(); err != nil {
+		return Fail(http.StatusInternalServerError, "internal", "could not finish account deletion", nil)
+	}
+	if s.deps.Storage != nil {
+		for _, key := range keys {
+			_ = s.deps.Storage.Delete(key)
+		}
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+func (s *Server) exportCurrentUser(c *echo.Context, userID string) (map[string]any, error) {
+	row := s.deps.DB.QueryRowContext(c.Request().Context(), s.contentSQL(`
+		SELECT id, email, created_at, is_admin, CASE WHEN totp_secret IS NULL OR totp_secret = '' THEN 0 ELSE 1 END
+		FROM users WHERE id = ?
+	`), userID)
+	var id, email string
+	var createdAt time.Time
+	var isAdmin int
+	var totpEnabled int
+	if err := row.Scan(&id, &email, &createdAt, &isAdmin, &totpEnabled); err != nil {
+		return nil, Fail(http.StatusInternalServerError, "internal", "could not export user profile", nil)
+	}
+	return map[string]any{
+		"id": id, "email": email, "created_at": createdAt,
+		"is_admin": isAdmin == 1, "totp_enabled": totpEnabled == 1,
+	}, nil
+}
+
+func (s *Server) exportTableByUser(c *echo.Context, table, userID string) ([]map[string]any, error) {
+	return s.exportRows(c, `SELECT * FROM `+table+` WHERE user_id = ?`, userID)
+}
+
+func (s *Server) exportAccessTokenMetadata(c *echo.Context, userID string) ([]map[string]any, error) {
+	return s.exportRows(c, `
+		SELECT id, name, created_at, expires_at, last_used_at, revoked_at
+		FROM access_tokens WHERE user_id = ?
+	`, userID)
+}
+
+func (s *Server) exportPaymentTransactions(c *echo.Context, userID string) ([]map[string]any, error) {
+	return s.exportRows(c, `
+		SELECT id, package_id, provider, provider_order_id, provider_capture_id, status,
+		       amount, currency, subscription_id, buyer_label, created_at, updated_at
+		FROM payment_transactions WHERE user_id = ?
+	`, userID)
+}
+
+func (s *Server) exportRows(c *echo.Context, query string, args ...any) ([]map[string]any, error) {
+	rows, err := s.deps.DB.QueryContext(c.Request().Context(), s.contentSQL(query), args...)
+	if err != nil {
+		if isMissingPrivacyTable(err) {
+			return []map[string]any{}, nil
+		}
+		return nil, Fail(http.StatusInternalServerError, "internal", "could not export data", nil)
+	}
+	defer rows.Close()
+	cols, err := rows.Columns()
+	if err != nil {
+		return nil, Fail(http.StatusInternalServerError, "internal", "could not read export columns", nil)
+	}
+	out := []map[string]any{}
+	for rows.Next() {
+		values := make([]any, len(cols))
+		ptrs := make([]any, len(cols))
+		for i := range values {
+			ptrs[i] = &values[i]
+		}
+		if err := rows.Scan(ptrs...); err != nil {
+			return nil, Fail(http.StatusInternalServerError, "internal", "could not read export row", nil)
+		}
+		row := map[string]any{}
+		for i, col := range cols {
+			row[col] = normalizePrivacyValue(values[i])
+		}
+		out = append(out, row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, Fail(http.StatusInternalServerError, "internal", "could not finish export", nil)
+	}
+	return out, nil
+}
+
+func normalizePrivacyValue(v any) any {
+	switch x := v.(type) {
+	case []byte:
+		var decoded any
+		if json.Valid(x) && json.Unmarshal(x, &decoded) == nil {
+			return decoded
+		}
+		return string(x)
+	default:
+		return x
+	}
+}
+
+func (s *Server) ensureUserCanSelfDelete(c *echo.Context, userID string) error {
+	var isAdmin int
+	if err := s.deps.DB.QueryRowContext(c.Request().Context(), s.contentSQL(`
+		SELECT is_admin FROM users WHERE id = ?
+	`), userID).Scan(&isAdmin); err != nil {
+		return Fail(http.StatusInternalServerError, "internal", "could not verify account", nil)
+	}
+	if isAdmin != 1 {
+		return nil
+	}
+	var admins int
+	if err := s.deps.DB.QueryRowContext(c.Request().Context(), `SELECT COUNT(*) FROM users WHERE is_admin = 1`).Scan(&admins); err != nil {
+		return Fail(http.StatusInternalServerError, "internal", "could not verify administrator count", nil)
+	}
+	if admins <= 1 {
+		return Fail(http.StatusConflict, "last_admin", "create another administrator before deleting this account", nil)
+	}
+	return nil
+}
+
+func (s *Server) collectUserStorageKeys(c *echo.Context, userID string) ([]string, error) {
+	tables := []string{"trade_attachments", "setup_attachments", "media_files"}
+	seen := map[string]bool{}
+	keys := []string{}
+	for _, table := range tables {
+		rows, err := s.exportRows(c, `SELECT storage_key FROM `+table+` WHERE user_id = ?`, userID)
+		if err != nil {
+			return nil, err
+		}
+		for _, row := range rows {
+			key, _ := row["storage_key"].(string)
+			if key == "" || seen[key] {
+				continue
+			}
+			seen[key] = true
+			keys = append(keys, key)
+		}
+	}
+	return keys, nil
+}
+
+func isMissingPrivacyTable(err error) bool {
+	if err == nil || errors.Is(err, sql.ErrNoRows) {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "no such table") ||
+		strings.Contains(msg, "does not exist") ||
+		strings.Contains(msg, "no such column")
 }

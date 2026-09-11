@@ -1,4 +1,4 @@
-import { apiFetch } from "./client";
+import { apiFetch, apiRawGet } from "./client";
 import type { Tokens } from "./types";
 
 export interface SetupStatus {
@@ -101,6 +101,12 @@ export const authApi = {
       }),
     }),
   me: () => apiFetch<Me>("/me"),
+  exportMyData: () => apiRawGet("/me/privacy/export"),
+  deleteMyData: (confirmation: string) =>
+    apiFetch<void>("/me/privacy", {
+      method: "DELETE",
+      body: JSON.stringify({ confirmation }),
+    }),
   /**
    * Returns a fresh token pair: the change invalidates every token minted
    * against the old password, including the one this request carried, so the

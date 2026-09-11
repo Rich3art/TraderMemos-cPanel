@@ -7,6 +7,7 @@ import {
   BadgeDollarSign,
   CreditCard,
   DatabaseZap,
+  LockKeyhole,
   Shield,
   ShieldCheck,
   Sparkles,
@@ -29,6 +30,7 @@ import { ApiTab } from "./settings/api-tab";
 import { CommercialFeedTab } from "./settings/commercial-feed-tab";
 import { EmailTab } from "./settings/email-tab";
 import { PaymentGatewaysTab } from "./settings/payment-gateways-tab";
+import { PrivacyTab } from "./settings/privacy-tab";
 import { RolesTab } from "./settings/roles-tab";
 import { SharingTab } from "./settings/sharing-tab";
 import { SubscriptionsTab } from "./settings/subscriptions-tab";
@@ -120,6 +122,7 @@ const NAV_ICONS: Record<SettingsSectionId, typeof Wallet> = {
   "payment-gateways": CreditCard,
   subscriptions: BadgeDollarSign,
   sharing: Link2,
+  privacy: LockKeyhole,
   about: Github,
 };
 
@@ -204,6 +207,7 @@ export function SettingsView(props: SettingsViewProps) {
         {section === "payment-gateways" && <PaymentGatewaysTab />}
         {section === "subscriptions" && <SubscriptionsTab />}
         {section === "sharing" && <SharingTab />}
+        {section === "privacy" && <PrivacyTab />}
         {section === "about" && <AboutTab />}
       </Page>
     </SettingsShell>

@@ -156,6 +156,7 @@ export type SettingsSectionId =
   | "payment-gateways"
   | "subscriptions"
   | "sharing"
+  | "privacy"
   | "about";
 
 export type SettingsLabelKey =
@@ -180,6 +181,7 @@ export type SettingsLabelKey =
   | "email"
   | "payment-gateways"
   | "subscriptions"
+  | "privacy"
   | "about"
   | "accountsTitle"
   | "accountsDescription"
@@ -201,6 +203,8 @@ export type SettingsLabelKey =
   | "payment-gatewaysDescription"
   | "subscriptionsTitle"
   | "subscriptionsDescription"
+  | "privacyTitle"
+  | "privacyDescription"
   | "sharing"
   | "sharingTitle"
   | "sharingDescription"
@@ -364,6 +368,7 @@ const SETTINGS_LABELS: Record<AppLocale, Record<SettingsLabelKey, string>> = {
       email: "Email",
       "payment-gateways": "Payment Gateways",
       subscriptions: "Subscriptions",
+      privacy: "Privacy / My Data",
       about: "About",
     accountsTitle: "Accounts & funding",
     accountsDescription: "Manage broker accounts, starting balances, and cash flows.",
@@ -397,6 +402,8 @@ const SETTINGS_LABELS: Record<AppLocale, Record<SettingsLabelKey, string>> = {
     "payment-gatewaysDescription": "Configure PayPal and future payment providers for subscription packages.",
     subscriptionsTitle: "Subscriptions",
     subscriptionsDescription: "Create access packages and public subscription links.",
+    privacyTitle: "Privacy / My Data",
+    privacyDescription: "Export your data, request corrections, or permanently delete your account.",
     sharing: "Sharing",
     sharingTitle: "Sharing",
     sharingDescription: "Public share links for a read-only performance summary.",
@@ -579,6 +586,7 @@ const SETTINGS_LABELS: Record<AppLocale, Record<SettingsLabelKey, string>> = {
       email: "Email",
       "payment-gateways": "Payment Gateways",
       subscriptions: "Subscriptions",
+      privacy: "Privacy / My Data",
     about: "關於",
     accountsTitle: "帳戶與資金",
     accountsDescription: "管理券商帳戶、起始結餘及現金流。",
@@ -612,6 +620,8 @@ const SETTINGS_LABELS: Record<AppLocale, Record<SettingsLabelKey, string>> = {
     "payment-gatewaysDescription": "Configure PayPal and future payment providers for subscription packages.",
     subscriptionsTitle: "Subscriptions",
     subscriptionsDescription: "Create access packages and public subscription links.",
+    privacyTitle: "Privacy / My Data",
+    privacyDescription: "Export your data, request corrections, or permanently delete your account.",
     sharing: "分享",
     sharingTitle: "分享",
     sharingDescription: "以唯讀方式公開分享績效摘要嘅連結。",
@@ -781,6 +791,7 @@ const SETTINGS_LABELS: Record<AppLocale, Record<SettingsLabelKey, string>> = {
       email: "Email",
       "payment-gateways": "Payment Gateways",
       subscriptions: "Subscriptions",
+      privacy: "Privacy / My Data",
     about: "について",
     accountsTitle: "アカウントと資金",
     accountsDescription: "証券会社アカウント、開始残高、キャッシュフローを管理します。",
@@ -815,6 +826,8 @@ const SETTINGS_LABELS: Record<AppLocale, Record<SettingsLabelKey, string>> = {
     "payment-gatewaysDescription": "Configure PayPal and future payment providers for subscription packages.",
     subscriptionsTitle: "Subscriptions",
     subscriptionsDescription: "Create access packages and public subscription links.",
+    privacyTitle: "Privacy / My Data",
+    privacyDescription: "Export your data, request corrections, or permanently delete your account.",
     sharing: "共有",
     sharingTitle: "共有",
     sharingDescription: "読み取り専用のパフォーマンス概要を公開する共有リンク。",
@@ -995,6 +1008,7 @@ const SETTINGS_LABELS: Record<AppLocale, Record<SettingsLabelKey, string>> = {
       email: "Email",
       "payment-gateways": "Payment Gateways",
       subscriptions: "Subscriptions",
+      privacy: "Privacy / My Data",
     about: "정보",
     accountsTitle: "계정 및 자금",
     accountsDescription: "브로커 계정, 시작 잔액, 현금 흐름을 관리합니다.",
@@ -1028,6 +1042,8 @@ const SETTINGS_LABELS: Record<AppLocale, Record<SettingsLabelKey, string>> = {
     "payment-gatewaysDescription": "Configure PayPal and future payment providers for subscription packages.",
     subscriptionsTitle: "Subscriptions",
     subscriptionsDescription: "Create access packages and public subscription links.",
+    privacyTitle: "Privacy / My Data",
+    privacyDescription: "Export your data, request corrections, or permanently delete your account.",
     sharing: "공유",
     sharingTitle: "공유",
     sharingDescription: "읽기 전용 성과 요약을 공개하는 공유 링크.",
@@ -1232,6 +1248,7 @@ export function settingsNavItems(locale: string): {
       { id: "payment-gateways", key: "payment-gateways" },
       { id: "subscriptions", key: "subscriptions" },
       { id: "sharing", key: "sharing" },
+      { id: "privacy", key: "privacy" },
       { id: "about", key: "about" },
     ] as const
   ).map(({ id, key }) => ({

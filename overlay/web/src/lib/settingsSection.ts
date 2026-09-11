@@ -16,6 +16,7 @@ export const SETTINGS_SECTION_IDS: SettingsSectionId[] = [
   "payment-gateways",
   "subscriptions",
   "sharing",
+  "privacy",
   "about",
 ];
 
