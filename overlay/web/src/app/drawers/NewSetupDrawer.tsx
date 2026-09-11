@@ -94,6 +94,8 @@ function SetupSymbolChart({
   setupId?: string | null;
 }) {
   const cleanSymbol = symbol.trim().toUpperCase();
+  const [loadedSymbol, setLoadedSymbol] = useState("");
+  const chartLoaded = loadedSymbol === cleanSymbol;
   const range = useMemo(() => setupChartWindow(), [cleanSymbol]);
   const barsQ = useMarketBars({
     symbol: cleanSymbol,
@@ -101,30 +103,45 @@ function SetupSymbolChart({
     from: range.from,
     to: range.to,
     interval: SETUP_CHART_INTERVAL,
-    enabled: cleanSymbol.length > 0,
+    enabled: cleanSymbol.length > 0 && chartLoaded,
   });
 
   if (!cleanSymbol) return null;
 
   return (
     <div className="rounded-lg bg-card p-3">
-      <Suspense fallback={<div className="h-[260px] rounded-lg bg-muted" aria-label="Loading setup chart" />}>
-        <SetupTradeChart
-          symbol={cleanSymbol}
-          bars={barsQ.data?.bars}
-          fills={[]}
-          loading={barsQ.isLoading}
-          error={barsQ.isError}
-          errorMessage={barsQ.error instanceof Error ? barsQ.error.message : undefined}
-          targetPrice={parseAmountToNumber(target)}
-          stopPrice={parseAmountToNumber(stop)}
-          interval={SETUP_CHART_INTERVAL}
-          height={260}
-          hideHeaderLabel
-          drawingTools
-          annotationScope={setupId ? { entityType: "setup", entityId: setupId } : null}
-        />
-      </Suspense>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <div className="text-sm font-medium text-foreground">Setup chart</div>
+          <div className="text-xs text-muted-foreground">{cleanSymbol}</div>
+        </div>
+        <Button type="button" size="sm" variant="soft" onClick={() => setLoadedSymbol(cleanSymbol)}>
+          Load chart
+        </Button>
+      </div>
+      {chartLoaded ? (
+        <Suspense fallback={<div className="h-[260px] rounded-lg bg-muted" aria-label="Loading setup chart" />}>
+          <SetupTradeChart
+            symbol={cleanSymbol}
+            bars={barsQ.data?.bars}
+            fills={[]}
+            loading={barsQ.isLoading}
+            error={barsQ.isError}
+            errorMessage={barsQ.error instanceof Error ? barsQ.error.message : undefined}
+            targetPrice={parseAmountToNumber(target)}
+            stopPrice={parseAmountToNumber(stop)}
+            interval={SETUP_CHART_INTERVAL}
+            height={260}
+            hideHeaderLabel
+            drawingTools
+            annotationScope={setupId ? { entityType: "setup", entityId: setupId } : null}
+          />
+        </Suspense>
+      ) : (
+        <div className="flex h-[260px] items-center justify-center rounded-lg border border-dashed border-border bg-muted/20 px-4 text-center text-sm text-muted-foreground">
+          Click Load chart to fetch market data and add drawings.
+        </div>
+      )}
     </div>
   );
 }
