@@ -80,6 +80,8 @@ func (s *Server) subscriptionRoutes(g *echo.Group) {
 	g.POST("/subscriptions/whop/create-checkout", s.handleCreateWhopCheckout)
 	g.POST("/subscriptions/paystack/initialize", s.handleInitializePaystackTransaction)
 	g.POST("/subscriptions/paystack/verify/:reference", s.handleVerifyPaystackTransaction)
+	g.POST("/subscriptions/stripe/create-checkout-session", s.handleCreateStripeCheckoutSession)
+	g.POST("/subscriptions/stripe/verify/:session_id", s.handleVerifyStripeCheckoutSession)
 }
 
 func (s *Server) publicSubscriptionRoutes(g *echo.Group) {
