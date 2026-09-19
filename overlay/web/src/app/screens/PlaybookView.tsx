@@ -768,8 +768,56 @@ export function PlaybookView({
     return `${setupCount} · ${traded.length} traded in this range`;
   };
 
-  const header = (
-    <header className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+  const playbookTabs = [
+    { label: "Daily Review", count: null, active: false },
+    { label: "Trading Notes", count: null, active: false },
+    { label: "Session Plan", count: null, active: false },
+    { label: "Setup Library", count: setups.length, active: true },
+  ];
+
+  const playbookHeader = (
+    <header className="border-b border-border pb-4">
+      <div>
+        <h1 className="text-[15px] font-semibold uppercase tracking-wide text-foreground">
+          The Playbook
+        </h1>
+        <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+          Review your trading days and turn repeatable patterns into setups.
+        </p>
+      </div>
+      <div
+        role="tablist"
+        aria-label="Playbook sections"
+        className="mt-5 flex gap-2 overflow-x-auto pb-1"
+      >
+        {playbookTabs.map((tab) => (
+          <button
+            key={tab.label}
+            type="button"
+            role="tab"
+            aria-selected={tab.active}
+            disabled={!tab.active}
+            className={cn(
+              "inline-flex h-9 shrink-0 items-center gap-2 rounded-md border px-3 text-[12px] font-medium transition-colors",
+              tab.active
+                ? "border-border bg-surface text-foreground shadow-sm"
+                : "border-transparent text-muted-foreground opacity-70",
+            )}
+          >
+            {tab.label}
+            {tab.count != null ? (
+              <span className="rounded-full border border-border bg-background px-1.5 py-0.5 text-[10px] tabular-nums text-muted-foreground">
+                {tab.count}
+              </span>
+            ) : null}
+          </button>
+        ))}
+      </div>
+    </header>
+  );
+
+  const setupLibraryHeader = (
+    <section className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
       <div className="min-w-0">
         <h2 className="text-[15px] font-semibold tracking-tight text-foreground">Setup Library</h2>
         <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">{subtitle()}</p>
@@ -828,7 +876,7 @@ export function PlaybookView({
           New setup
         </Button>
       </div>
-    </header>
+    </section>
   );
 
   const summaryCard = (
@@ -961,7 +1009,8 @@ export function PlaybookView({
 
   return (
     <Page>
-      {header}
+      {playbookHeader}
+      {setupLibraryHeader}
       {renderContent()}
     </Page>
   );
