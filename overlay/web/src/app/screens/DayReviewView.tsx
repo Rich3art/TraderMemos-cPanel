@@ -243,6 +243,33 @@ export function DayReviewView({
         )}
       </Card>
 
+      {notesLoading ? (
+        <Card title="Daily log">
+          <Skeleton height="72px" />
+        </Card>
+      ) : dailyLogs.length > 0 ? (
+        <Card title="Daily log">
+          <ul className="m-0 flex list-none flex-col gap-2 p-0">
+            {dailyLogs.slice(0, 2).map((n) => (
+              <li key={n.id}>
+                <button
+                  type="button"
+                  onClick={onOpenNotes}
+                  className="flex w-full cursor-pointer flex-col gap-1 rounded-md border-none bg-transparent px-2 py-2 text-left transition-colors hover:bg-accent"
+                >
+                  <span className="text-[13px] font-medium text-foreground">
+                    {n.title || "Daily log"}
+                  </span>
+                  <span className="text-xs leading-relaxed text-muted-foreground">
+                    {noteExcerpt(n.body)}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
+
       <Card title="Session summary">
         {summaryLoading ? (
           <Skeleton height="88px" />
