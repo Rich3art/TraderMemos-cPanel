@@ -32,6 +32,7 @@ type NavLabelKey =
   | "getFunded"
   | "resources"
   | "notes"
+  | "templates"
   | "feedback"
   | "playbook"
   | "calculator"
@@ -55,6 +56,7 @@ const NAV_LABELS: Record<AppLocale, Record<NavLabelKey, string>> = {
     getFunded: "Get Funded",
     resources: "Resources",
     notes: "Notes",
+    templates: "Templates",
     feedback: "Feedback",
     playbook: "Playbook",
     calculator: "Calculator",
@@ -77,6 +79,7 @@ const NAV_LABELS: Record<AppLocale, Record<NavLabelKey, string>> = {
     getFunded: "資金帳戶",
     resources: "資源",
     notes: "筆記",
+    templates: "範本",
     feedback: "意見回饋",
     playbook: "策略庫",
     calculator: "計算器",
@@ -99,6 +102,7 @@ const NAV_LABELS: Record<AppLocale, Record<NavLabelKey, string>> = {
     getFunded: "資金調達",
     resources: "リソース",
     notes: "メモ",
+    templates: "テンプレート",
     feedback: "フィードバック",
     playbook: "プレイブック",
     calculator: "計算機",
@@ -121,6 +125,7 @@ const NAV_LABELS: Record<AppLocale, Record<NavLabelKey, string>> = {
     getFunded: "펀딩",
     resources: "리소스",
     notes: "메모",
+    templates: "템플릿",
     feedback: "피드백",
     playbook: "플레이북",
     calculator: "계산기",

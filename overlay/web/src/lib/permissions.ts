@@ -10,6 +10,7 @@ const MENU_PERMISSIONS: Record<string, string> = {
   "/get-funded": "menu.get_funded",
   "/resources": "menu.resources",
   "/notes": "menu.notes",
+  "/templates": "menu.templates",
   "/feedback": "menu.feedback",
   "/playbook": "menu.playbook",
   "/calculator": "menu.calculator",

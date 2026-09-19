@@ -416,6 +416,8 @@ export function NewSetupDrawer() {
                     value={field.state.value}
                     onBlur={field.handleBlur}
                     onChange={(e) => field.handleChange(e.target.value)}
+                    templates
+                    onTemplateApply={field.handleChange}
                     placeholder="Why this setup? Entry criteria, invalidation…"
                     rows={3}
                   />
@@ -442,6 +444,8 @@ export function NewSetupDrawer() {
                       value={field.state.value}
                       onBlur={field.handleBlur}
                       onChange={(e) => field.handleChange(e.target.value)}
+                      templates
+                      onTemplateApply={field.handleChange}
                       placeholder={"Above VWAP\nRelative volume > 2"}
                       rows={4}
                     />

@@ -1444,6 +1444,8 @@ function SymbolCard({
                     aria-label={`Entry reason${suffix}`}
                     value={block.entryReason}
                     onChange={(e) => set("entryReason", e.target.value)}
+                    templates
+                    onTemplateApply={(value) => set("entryReason", value)}
                     rows={2}
                     placeholder="Why did you enter?"
                   />
@@ -1457,6 +1459,8 @@ function SymbolCard({
                     aria-label={`Exit reason${suffix}`}
                     value={block.exitReason}
                     onChange={(e) => set("exitReason", e.target.value)}
+                    templates
+                    onTemplateApply={(value) => set("exitReason", value)}
                     rows={2}
                     placeholder="Why did you exit?"
                   />
@@ -1470,6 +1474,8 @@ function SymbolCard({
                     aria-label={`Review notes${suffix}`}
                     value={block.reviewNotes}
                     onChange={(e) => set("reviewNotes", e.target.value)}
+                    templates
+                    onTemplateApply={(value) => set("reviewNotes", value)}
                     rows={3}
                     placeholder="What would you do differently?"
                   />
