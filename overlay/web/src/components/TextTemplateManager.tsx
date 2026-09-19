@@ -4,13 +4,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  deleteTextTemplate,
-  listTextTemplates,
-  saveTextTemplate,
-  setTextTemplateFavorite,
-  TEXT_TEMPLATES_CHANGED,
+  combineTextTemplates,
   type TextTemplate,
 } from "@/lib/textTemplates";
+import {
+  useCreateTextTemplate,
+  useDeleteTextTemplate,
+  useTextTemplates,
+  useUpdateTextTemplate,
+} from "@/lib/hooks/useTextTemplates";
 import { cn } from "@/lib/cn";
 
 function blankTemplate(): TextTemplate {
@@ -26,20 +28,14 @@ function blankTemplate(): TextTemplate {
 }
 
 export function TextTemplateManager() {
-  const [templates, setTemplates] = useState(() => listTextTemplates());
+  const templatesQ = useTextTemplates();
+  const createTemplate = useCreateTextTemplate();
+  const updateTemplate = useUpdateTextTemplate();
+  const deleteTemplate = useDeleteTextTemplate();
+  const templates = useMemo(() => combineTextTemplates(templatesQ.data), [templatesQ.data]);
   const [selectedId, setSelectedId] = useState<string | null>(templates[0]?.id ?? null);
   const selected = templates.find((template) => template.id === selectedId) ?? null;
   const [draft, setDraft] = useState<TextTemplate>(() => selected ?? blankTemplate());
-
-  useEffect(() => {
-    const refresh = () => setTemplates(listTextTemplates());
-    window.addEventListener(TEXT_TEMPLATES_CHANGED, refresh);
-    window.addEventListener("storage", refresh);
-    return () => {
-      window.removeEventListener(TEXT_TEMPLATES_CHANGED, refresh);
-      window.removeEventListener("storage", refresh);
-    };
-  }, []);
 
   useEffect(() => {
     setDraft(selected ?? blankTemplate());
@@ -59,21 +55,42 @@ export function TextTemplateManager() {
     setDraft(blankTemplate());
   };
 
-  const save = () => {
-    const saved = saveTextTemplate(draft);
+  const save = async () => {
+    const body = {
+      name: draft.name,
+      body: draft.body,
+      scope: draft.scope,
+      favorite: Boolean(draft.favorite),
+    };
+    const saved = draft.id && !draft.system
+      ? await updateTemplate.mutateAsync({ id: draft.id, body })
+      : await createTemplate.mutateAsync(body);
     setSelectedId(saved.id);
   };
 
-  const remove = () => {
+  const remove = async () => {
     if (!selected || selected.system) return;
-    deleteTextTemplate(selected.id);
+    await deleteTemplate.mutateAsync(selected.id);
     setSelectedId(null);
   };
 
-  const toggleFavorite = () => {
+  const toggleFavorite = async () => {
     if (!selected) return;
-    setTextTemplateFavorite(selected.id, !selected.favorite);
+    const body = {
+      name: selected.name,
+      body: selected.body,
+      scope: selected.scope,
+      favorite: !selected.favorite,
+    };
+    if (selected.system) {
+      const saved = await createTemplate.mutateAsync(body);
+      setSelectedId(saved.id);
+      return;
+    }
+    await updateTemplate.mutateAsync({ id: selected.id, body });
   };
+
+  const saving = createTemplate.isPending || updateTemplate.isPending || deleteTemplate.isPending;
 
   return (
     <section className="min-h-[calc(100vh-7rem)] overflow-hidden rounded-lg border border-border bg-card">
@@ -83,6 +100,11 @@ export function TextTemplateManager() {
             <Plus size={16} strokeWidth={1.75} aria-hidden />
             New Template
           </Button>
+          {templatesQ.isError ? (
+            <div className="mt-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              Could not load saved templates.
+            </div>
+          ) : null}
           <TemplateGroup
             title="Favorites"
             count={groups.favorites.length}
@@ -136,7 +158,7 @@ export function TextTemplateManager() {
                 </div>
                 <div className="flex gap-2">
                   {selected ? (
-                    <Button variant="outline" onClick={toggleFavorite}>
+                    <Button variant="outline" onClick={toggleFavorite} disabled={saving}>
                       <Star size={16} strokeWidth={1.75} aria-hidden />
                       {selected.favorite ? "Unfavorite" : "Favorite"}
                     </Button>
@@ -144,12 +166,12 @@ export function TextTemplateManager() {
                   {!draft.system ? (
                     <>
                       {selected ? (
-                        <Button variant="destructive-outline" onClick={remove}>
+                        <Button variant="destructive-outline" onClick={remove} disabled={saving}>
                           <Trash2 size={16} strokeWidth={1.75} aria-hidden />
                           Delete
                         </Button>
                       ) : null}
-                      <Button onClick={save}>
+                      <Button onClick={save} disabled={saving}>
                         <Save size={16} strokeWidth={1.75} aria-hidden />
                         Save
                       </Button>

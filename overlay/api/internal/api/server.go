@@ -235,6 +235,7 @@ func (s *Server) routes() {
 	s.settingsRoutes(protected)
 	s.alertRoutes(protected)
 	s.noteRoutes(protected)
+	s.textTemplateRoutes(protected)
 	s.feedbackRoutes(protected)
 	s.getFundedRoutes(protected)
 	s.contentRoutes(protected)

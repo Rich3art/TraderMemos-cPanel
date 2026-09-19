@@ -7,12 +7,11 @@ export type TextTemplate = {
   scope: TextTemplateScope;
   favorite?: boolean;
   system?: boolean;
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
+  created_at?: string;
+  updated_at?: string;
 };
-
-const STORAGE_KEY = "tradermemos.textTemplates.v1";
-export const TEXT_TEMPLATES_CHANGED = "tradermemos:text-templates-changed";
 
 export const SYSTEM_TEXT_TEMPLATES: TextTemplate[] = [
   {
@@ -111,76 +110,6 @@ export const SYSTEM_TEXT_TEMPLATES: TextTemplate[] = [
   },
 ];
 
-function readCustomTemplates(): TextTemplate[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? "[]");
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (item): item is TextTemplate =>
-        item &&
-        typeof item.id === "string" &&
-        typeof item.name === "string" &&
-        typeof item.body === "string",
-    );
-  } catch {
-    return [];
-  }
-}
-
-function writeCustomTemplates(templates: TextTemplate[]) {
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(templates));
-  window.dispatchEvent(new Event(TEXT_TEMPLATES_CHANGED));
-}
-
-export function listTextTemplates() {
-  return [...SYSTEM_TEXT_TEMPLATES, ...readCustomTemplates()];
-}
-
-export function listCustomTextTemplates() {
-  return readCustomTemplates();
-}
-
-export function saveTextTemplate(input: Partial<TextTemplate> & Pick<TextTemplate, "name" | "body">) {
-  const now = new Date().toISOString();
-  const templates = readCustomTemplates();
-  const id = input.id && !input.system ? input.id : `template-${crypto.randomUUID()}`;
-  const existing = templates.find((template) => template.id === id);
-  const next: TextTemplate = {
-    id,
-    name: input.name.trim() || "Untitled Template",
-    body: input.body,
-    scope: input.scope ?? existing?.scope ?? "general",
-    favorite: Boolean(input.favorite ?? existing?.favorite),
-    createdAt: existing?.createdAt ?? now,
-    updatedAt: now,
-  };
-  writeCustomTemplates([next, ...templates.filter((template) => template.id !== id)]);
-  return next;
-}
-
-export function deleteTextTemplate(id: string) {
-  writeCustomTemplates(readCustomTemplates().filter((template) => template.id !== id));
-}
-
-export function setTextTemplateFavorite(id: string, favorite: boolean) {
-  const custom = readCustomTemplates();
-  const existingCustom = custom.find((template) => template.id === id);
-  if (existingCustom) {
-    writeCustomTemplates(
-      custom.map((template) =>
-        template.id === id ? { ...template, favorite, updatedAt: new Date().toISOString() } : template,
-      ),
-    );
-    return;
-  }
-
-  const systemTemplate = SYSTEM_TEXT_TEMPLATES.find((template) => template.id === id);
-  if (!systemTemplate) return;
-  saveTextTemplate({
-    ...systemTemplate,
-    id: `custom-${systemTemplate.id}`,
-    system: false,
-    favorite,
-  });
+export function combineTextTemplates(custom: TextTemplate[] | undefined): TextTemplate[] {
+  return [...SYSTEM_TEXT_TEMPLATES, ...(custom ?? [])];
 }

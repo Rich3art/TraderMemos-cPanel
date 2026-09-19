@@ -1,5 +1,5 @@
 import { FileText, Star } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import {
@@ -8,11 +8,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-  listTextTemplates,
-  TEXT_TEMPLATES_CHANGED,
-  type TextTemplate,
-} from "@/lib/textTemplates";
+import { combineTextTemplates, type TextTemplate } from "@/lib/textTemplates";
+import { useTextTemplates } from "@/lib/hooks/useTextTemplates";
 import { cn } from "@/lib/cn";
 
 export function TextTemplateButton({
@@ -22,18 +19,8 @@ export function TextTemplateButton({
   onApply: (body: string, template: TextTemplate) => void;
   className?: string;
 }) {
-  const [templates, setTemplates] = useState(() => listTextTemplates());
-
-  useEffect(() => {
-    const refresh = () => setTemplates(listTextTemplates());
-    window.addEventListener(TEXT_TEMPLATES_CHANGED, refresh);
-    window.addEventListener("storage", refresh);
-    return () => {
-      window.removeEventListener(TEXT_TEMPLATES_CHANGED, refresh);
-      window.removeEventListener("storage", refresh);
-    };
-  }, []);
-
+  const templatesQ = useTextTemplates();
+  const templates = useMemo(() => combineTextTemplates(templatesQ.data), [templatesQ.data]);
   const favorites = useMemo(() => templates.filter((template) => template.favorite), [templates]);
   const visibleTemplates = favorites.length > 0 ? favorites : templates.slice(0, 6);
 
@@ -56,7 +43,9 @@ export function TextTemplateButton({
         <div className="space-y-3 p-3">
           <div>
             <div className="text-sm font-semibold text-foreground">Templates</div>
-            <div className="text-xs text-muted-foreground">Insert saved text into this field.</div>
+            <div className="text-xs text-muted-foreground">
+              {templatesQ.isError ? "Could not load saved templates." : "Insert saved text into this field."}
+            </div>
           </div>
           <div className="max-h-72 space-y-1 overflow-y-auto">
             {visibleTemplates.map((template) => (
