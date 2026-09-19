@@ -3,6 +3,7 @@ import { ExternalLink, Trash2, X, Zap } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import { TradeChartSection } from "./charts/TradeChartSection";
 import { RiskRewardPanel } from "./RiskRewardPanel";
+import { TradeJournalCard } from "./TradeJournalCard";
 import {
   Drawer,
   DrawerBody,
@@ -385,6 +386,8 @@ function TradeDetailSheetBody({
 
       <RiskRewardPanel trade={trade} className="p-0" hideWhenEmpty />
 
+      <TradeJournalCard trade={trade} onEdit={onOpenFullPage} />
+
       <div className="-mx-4">
         <TradeChartSection trade={trade} />
       </div>
@@ -428,22 +431,6 @@ function TradeDetailSheetBody({
         )}
       </section>
 
-      {trade.notes.trim() !== "" && (
-        <section>
-          <p className={sectionLabelClass}>Notes</p>
-          <p className="m-0 line-clamp-3 text-sm whitespace-pre-wrap text-muted-foreground">
-            {trade.notes}
-          </p>
-          <Button
-            type="button"
-            variant="link"
-            onClick={onOpenFullPage}
-            className="mt-1.5 h-auto text-xs"
-          >
-            Read more
-          </Button>
-        </section>
-      )}
     </div>
   );
 }
