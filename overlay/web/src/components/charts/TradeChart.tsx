@@ -84,6 +84,14 @@ export function readStoredChartDrawings(symbol: string, interval: BarInterval): 
   }
 }
 
+export function clearStoredChartDrawings(symbol: string, interval: BarInterval) {
+  try {
+    localStorage.removeItem(drawingStorageKey(symbol, interval));
+  } catch {
+    // Local drawing persistence is best-effort.
+  }
+}
+
 function isDrawingTool(value: string): value is DrawingTool {
   return [
     "select",

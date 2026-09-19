@@ -63,6 +63,8 @@ const SetupTradeChart = lazy(() =>
 );
 const readStoredChartDrawings = () =>
   import("@/components/charts/TradeChart").then((m) => m.readStoredChartDrawings);
+const clearStoredChartDrawings = () =>
+  import("@/components/charts/TradeChart").then((m) => m.clearStoredChartDrawings);
 
 function valuesFromDraft(draft: NonNullable<ReturnType<typeof useUI.getState>["setupDraft"]>) {
   return {
@@ -192,6 +194,7 @@ export function NewSetupDrawer() {
         }
         if (savedId) {
           const readDrawings = await readStoredChartDrawings();
+          const clearDrawings = await clearStoredChartDrawings();
           const drawings = readDrawings(body.symbol ?? "", SETUP_CHART_INTERVAL);
           if (drawings.length > 0) {
             await chartAnnotationsApi.save(
@@ -200,6 +203,7 @@ export function NewSetupDrawer() {
               SETUP_CHART_INTERVAL,
               drawings,
             );
+            clearDrawings(body.symbol ?? "", SETUP_CHART_INTERVAL);
           }
           for (const file of capScreenshots(pendingFiles, maxScreenshots)) {
             const fd = new FormData();

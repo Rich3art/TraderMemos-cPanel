@@ -22,9 +22,12 @@ import { RichTextEditor } from "@/components/RichTextEditor";
 import { ListSkeleton } from "@/components/skeletons/list-skeleton";
 import { pnlColor } from "@/components/theme-tokens";
 import { Button } from "@/components/ui/button";
+import { chartAnnotationsApi } from "@/lib/api/chartAnnotations";
 import { setupsApi } from "@/lib/api/setups";
+import type { BarInterval } from "@/lib/api/market";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import type { BreakGroup, Setup, Trade } from "@/lib/api/types";
+import type { ChartDrawing } from "@/components/charts/TradeChart";
 import { cn } from "@/lib/cn";
 import { usePrivacyMode } from "@/lib/displayPrefs";
 import { fmtPct, fmtSignedMoney } from "@/lib/format";
@@ -88,6 +91,9 @@ const SESSION_CHECKLIST = [
   "Risk limits checked",
   "Execution alerts ready",
 ];
+const SETUP_CHART_INTERVAL: BarInterval = "240";
+
+type PreviewPoint = { time: number; price: number };
 
 /** Metric sorts read best high-to-low; names read A→Z. */
 const DEFAULT_DIR: Record<SortKey, SortDir> = {
@@ -538,6 +544,134 @@ function PlayExamples({ setup, compact = false }: { setup: Setup; compact?: bool
   );
 }
 
+function collectDrawingPoints(drawings: ChartDrawing[]): PreviewPoint[] {
+  const points: PreviewPoint[] = [];
+  for (const drawing of drawings) {
+    if (drawing.type === "horizontal") {
+      points.push({ time: 0, price: drawing.price });
+    } else if (drawing.type === "vertical") {
+      points.push({ time: drawing.time, price: 0 });
+    } else {
+      points.push(drawing.from, drawing.to);
+    }
+  }
+  return points;
+}
+
+function annotationPreviewBounds(drawings: ChartDrawing[]) {
+  const points = collectDrawingPoints(drawings);
+  const times = points.map((p) => p.time).filter((v) => Number.isFinite(v));
+  const prices = points.map((p) => p.price).filter((v) => Number.isFinite(v));
+  const minTime = Math.min(...times, 0);
+  const maxTime = Math.max(...times, 1);
+  const minPrice = Math.min(...prices, 0);
+  const maxPrice = Math.max(...prices, 1);
+  return {
+    minTime,
+    maxTime: maxTime === minTime ? minTime + 1 : maxTime,
+    minPrice,
+    maxPrice: maxPrice === minPrice ? minPrice + 1 : maxPrice,
+  };
+}
+
+function AnnotationPreviewOverlay({ drawings }: { drawings: ChartDrawing[] }) {
+  const markerId = useMemo(
+    () => `setup-preview-arrow-${drawings[0]?.id.replace(/[^a-zA-Z0-9_-]/g, "") ?? "empty"}`,
+    [drawings],
+  );
+  if (drawings.length === 0) return null;
+  const bounds = annotationPreviewBounds(drawings);
+  const x = (time: number) => 28 + ((time - bounds.minTime) / (bounds.maxTime - bounds.minTime)) * 344;
+  const y = (price: number) => 156 - ((price - bounds.minPrice) / (bounds.maxPrice - bounds.minPrice)) * 132;
+  const lineColor = "rgb(56, 189, 248)";
+
+  return (
+    <svg viewBox="0 0 400 180" className="absolute inset-0 h-full w-full" aria-hidden>
+      <defs>
+        <marker id={markerId} markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+          <path d="M 0 0 L 8 4 L 0 8 z" fill={lineColor} />
+        </marker>
+      </defs>
+      {drawings.slice(0, 12).map((drawing) => {
+        if (drawing.type === "horizontal") {
+          const yy = y(drawing.price);
+          return <line key={drawing.id} x1="16" x2="384" y1={yy} y2={yy} stroke={lineColor} strokeWidth="2" />;
+        }
+        if (drawing.type === "vertical") {
+          const xx = x(drawing.time);
+          return <line key={drawing.id} x1={xx} x2={xx} y1="16" y2="164" stroke={lineColor} strokeWidth="2" />;
+        }
+        const x1 = x(drawing.from.time);
+        const y1 = y(drawing.from.price);
+        const x2 = x(drawing.to.time);
+        const y2 = y(drawing.to.price);
+        if (drawing.type === "rectangle") {
+          return (
+            <rect
+              key={drawing.id}
+              x={Math.min(x1, x2)}
+              y={Math.min(y1, y2)}
+              width={Math.abs(x2 - x1)}
+              height={Math.abs(y2 - y1)}
+              fill="rgba(56, 189, 248, 0.14)"
+              stroke={lineColor}
+              strokeWidth="2"
+            />
+          );
+        }
+        if (drawing.type === "curved-arrow") {
+          const cx = (x1 + x2) / 2;
+          const cy = Math.min(y1, y2) - 22;
+          return (
+            <path
+              key={drawing.id}
+              d={`M ${x1} ${y1} Q ${cx} ${cy} ${x2} ${y2}`}
+              fill="none"
+              stroke={lineColor}
+              strokeWidth="2"
+              markerEnd={`url(#${markerId})`}
+            />
+          );
+        }
+        if (drawing.type === "fib-projection") {
+          const projection = drawing.to.price - drawing.from.price;
+          return (
+            <g key={drawing.id}>
+              {[0, 0.618, 1, 1.272, 1.618].map((level) => {
+                const yy = y(drawing.to.price + projection * level);
+                return (
+                  <line
+                    key={level}
+                    x1="16"
+                    x2="384"
+                    y1={yy}
+                    y2={yy}
+                    stroke={lineColor}
+                    strokeWidth="1.5"
+                    strokeOpacity={level === 0 || level === 1 ? 0.95 : 0.65}
+                  />
+                );
+              })}
+            </g>
+          );
+        }
+        return (
+          <line
+            key={drawing.id}
+            x1={x1}
+            y1={y1}
+            x2={x2}
+            y2={y2}
+            stroke={lineColor}
+            strokeWidth="2"
+            markerEnd={drawing.type === "arrow" ? `url(#${markerId})` : undefined}
+          />
+        );
+      })}
+    </svg>
+  );
+}
+
 function SetupChartPreview({ setup }: { setup: Setup }) {
   const first = setup.attachments?.[0];
   const urls = useAuthedAttachmentUrls(
@@ -545,6 +679,28 @@ function SetupChartPreview({ setup }: { setup: Setup }) {
     setupsApi.attachmentFileUrl,
   );
   const src = first ? urls.get(first.id) : undefined;
+  const [drawings, setDrawings] = useState<ChartDrawing[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!setup.symbol) {
+      setDrawings([]);
+      return;
+    }
+    chartAnnotationsApi
+      .get<ChartDrawing>(
+        { entityType: "setup", entityId: setup.id },
+        setup.symbol,
+        SETUP_CHART_INTERVAL,
+      )
+      .then((record) => {
+        const savedDrawings = Array.isArray(record.drawings) ? record.drawings : [];
+        if (!cancelled && savedDrawings.length > 0) setDrawings(savedDrawings);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [setup.id, setup.symbol]);
 
   return (
     <div className="relative aspect-[16/9] overflow-hidden rounded-t-lg border-b border-border bg-muted">
@@ -569,9 +725,15 @@ function SetupChartPreview({ setup }: { setup: Setup }) {
           <line x1="0" y1="118" x2="400" y2="118" stroke="currentColor" strokeDasharray="3 3" opacity="0.45" />
         </svg>
       ) : null}
+      <AnnotationPreviewOverlay drawings={drawings} />
       <div className="absolute top-3 left-3 rounded-md border border-border bg-background/80 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-foreground backdrop-blur">
         Setup
       </div>
+      {drawings.length > 0 ? (
+        <div className="absolute right-3 bottom-3 rounded-md border border-primary/35 bg-background/80 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-primary backdrop-blur">
+          {drawings.length} annotation{drawings.length === 1 ? "" : "s"}
+        </div>
+      ) : null}
     </div>
   );
 }
