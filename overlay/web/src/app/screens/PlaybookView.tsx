@@ -1,25 +1,20 @@
 import {
-  ArrowDownRight,
-  ArrowUpRight,
   BookOpen,
   Check,
-  ChevronDown,
-  ChevronsUpDown,
-  ChevronUp,
+  CalendarDays,
   Eye,
   EyeOff,
   ImageIcon,
   ListFilter,
   Pencil,
   Plus,
-  CircleHelp,
   Trash2,
   X,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Card } from "@/components/Card";
 import { EmptyState } from "@/components/EmptyState";
-import { Item, ItemActions, ItemGroup, ItemTitle } from "@/components/Item";
+import { ItemActions, ItemGroup } from "@/components/Item";
 import { Page } from "@/components/Page";
 import { Pill } from "@/components/Pill";
 import { ListSkeleton } from "@/components/skeletons/list-skeleton";
@@ -65,16 +60,6 @@ interface SetupRowModel {
   exp: number;
   hasData: boolean;
 }
-
-/**
- * Shared grid template for the traded-plays header and its rows so metric
- * labels line up over their values. Below `xl` rows collapse to a stacked
- * card-ish layout with a compact meta line instead of columns.
- */
-const PLAY_GRID = cn(
-  "xl:grid xl:items-center xl:gap-x-4",
-  "xl:grid-cols-[minmax(9rem,1fr)_5rem_5.5rem_6.75rem_6.5rem_7rem_7.5rem]",
-);
 
 const METRIC_COLUMNS: { key: SortKey; label: string }[] = [
   { key: "trades", label: "Trades" },
@@ -177,6 +162,16 @@ function setupSubline(setup: Setup): string {
   return setup.thesis || setup.description || planBits(setup).join(" · ");
 }
 
+function formatSetupDate(setup: Setup): string {
+  const date = new Date(setup.created_at);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat(intlLocale(), {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
 function PlayExamples({ setup, compact = false }: { setup: Setup; compact?: boolean }) {
   const attachments = setup.attachments ?? [];
   const preview = attachments.slice(0, compact ? 2 : 3);
@@ -189,7 +184,7 @@ function PlayExamples({ setup, compact = false }: { setup: Setup; compact?: bool
   return (
     <div
       className={cn("mt-2 flex items-center gap-1.5", compact && "mt-1")}
-      aria-label={`${attachments.length} playbook example screenshot${attachments.length === 1 ? "" : "s"}`}
+                aria-label={`${attachments.length} setup example screenshot${attachments.length === 1 ? "" : "s"}`}
     >
       {preview.map((att) => {
         const src = urls.get(att.id);
@@ -215,6 +210,44 @@ function PlayExamples({ setup, compact = false }: { setup: Setup; compact?: bool
           +{attachments.length - preview.length}
         </span>
       ) : null}
+    </div>
+  );
+}
+
+function SetupChartPreview({ setup }: { setup: Setup }) {
+  const first = setup.attachments?.[0];
+  const urls = useAuthedAttachmentUrls(
+    first ? [first.id] : [],
+    setupsApi.attachmentFileUrl,
+  );
+  const src = first ? urls.get(first.id) : undefined;
+
+  return (
+    <div className="relative aspect-[16/9] overflow-hidden rounded-t-lg border-b border-border bg-muted">
+      {src ? (
+        <img src={src} alt={first?.filename ?? setup.name} className="h-full w-full object-cover" />
+      ) : (
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,var(--border)_1px,transparent_1px),linear-gradient(to_bottom,var(--border)_1px,transparent_1px)] bg-[size:14.28%_20%] opacity-45" />
+      )}
+      {!src ? (
+        <svg
+          viewBox="0 0 400 180"
+          className="absolute inset-0 h-full w-full text-primary/75"
+          preserveAspectRatio="none"
+          aria-hidden
+        >
+          <polyline
+            points="0,95 34,86 70,110 104,62 138,75 174,42 212,96 246,83 282,120 318,101 356,132 400,118"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          />
+          <line x1="0" y1="118" x2="400" y2="118" stroke="currentColor" strokeDasharray="3 3" opacity="0.45" />
+        </svg>
+      ) : null}
+      <div className="absolute top-3 left-3 rounded-md border border-border bg-background/80 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-foreground backdrop-blur">
+        Setup
+      </div>
     </div>
   );
 }
@@ -257,94 +290,6 @@ function pickBest(
 // Row pieces
 // ---------------------------------------------------------------------------
 
-function PlayIcon({
-  setup,
-  tone,
-  /** Bare glyph for chips, where a tinted tile would out-shout the name. */
-  chip = false,
-}: {
-  setup: Setup;
-  tone: "pos" | "neg" | "muted";
-  chip?: boolean;
-}) {
-  const Icon = setup.direction
-    ? setup.direction === "unknown"
-      ? CircleHelp
-      : setup.direction === "short"
-      ? ArrowDownRight
-      : ArrowUpRight
-    : BookOpen;
-
-  if (chip) {
-    return (
-      <Icon
-        size={13}
-        strokeWidth={setup.direction ? 2 : 1.75}
-        aria-hidden
-        className="shrink-0 text-muted-foreground"
-      />
-    );
-  }
-
-  return (
-    <span
-      aria-hidden
-      className={cn(
-        "flex size-9 shrink-0 items-center justify-center rounded-md",
-        tone === "pos"
-          ? "bg-profit/10 text-profit"
-          : tone === "neg"
-            ? "bg-destructive/10 text-destructive"
-            : "bg-accent text-muted-foreground",
-      )}
-    >
-      <Icon size={16} strokeWidth={setup.direction ? 2 : 1.75} />
-    </span>
-  );
-}
-
-function MetricCell({
-  value,
-  valueClass,
-  /** 0–1 ratio rendered as a hairline bar under the value (win rate). */
-  ratio,
-  title,
-}: {
-  value: string;
-  valueClass?: string;
-  ratio?: number;
-  title?: string;
-}) {
-  return (
-    <div className="flex flex-col items-end gap-1" title={title}>
-      <span
-        className={cn(
-          "text-[13px] font-semibold tabular-nums text-foreground",
-          value === "—" && "font-medium text-muted-foreground",
-          valueClass,
-        )}
-      >
-        {value}
-      </span>
-      {/* Slot is reserved in every cell so values keep one baseline across columns. */}
-      <span
-        className={cn(
-          "flex h-[3px] w-full overflow-hidden rounded-full",
-          ratio != null && "bg-accent",
-        )}
-        aria-hidden
-      >
-        {ratio != null ? (
-          <span
-            className="h-full rounded-full bg-profit"
-            style={{ width: `${Math.round(Math.min(Math.max(ratio, 0), 1) * 100)}%` }}
-          />
-        ) : null}
-      </span>
-    </div>
-  );
-}
-
 interface RowActions {
   onEdit: (setup: Setup) => void;
   onDelete: (setup: Setup) => void;
@@ -356,7 +301,7 @@ interface SetupActionsProps extends RowActions {
 }
 
 /**
- * Trade, edit and delete stay visible on every play. Delete swaps in a compact
+ * Trade, edit and delete stay visible on every setup. Delete swaps in a compact
  * ✓/✕ confirm in place so the cluster keeps its width. Renders bare buttons —
  * the caller supplies the container (`ItemActions` on chips, the grid's last
  * column on traded rows).
@@ -440,13 +385,28 @@ interface PlayRowProps extends RowActions {
   fxRate: number;
 }
 
-function TradedPlayRow({ row, currency, fxRate, ...actions }: PlayRowProps) {
+function SetupLibraryCard({
+  row,
+  currency,
+  fxRate,
+  rangeStatus,
+  ...actions
+}: PlayRowProps & { rangeStatus: "traded" | "unused" }) {
   const locale = intlLocale();
-  const { setup, trades, wins, losses, winRate, netPnl, pf, exp } = row;
+  const { setup, trades, winRate, netPnl, pf } = row;
   const subline = setupSubline(setup);
   const money = (v: number) => fmtSignedMoney(v * fxRate, currency, locale);
   const directionLabel =
     setup.direction === "short" ? "SHORT" : setup.direction === "long" ? "LONG" : "?";
+  const date = formatSetupDate(setup);
+  const entryValidation = setup.thesis || setup.description || "No entry validation saved.";
+  const exitValidation =
+    planBits(setup).join(" · ") || "No exit or invalidation notes saved.";
+  const notes = setup.checklist?.length
+    ? setup.checklist.join(" · ")
+    : trades > 0
+      ? `${trades} trade${trades === 1 ? "" : "s"} in this range · ${fmtPct(winRate, locale)} WR`
+      : "No notes saved yet.";
 
   return (
     <div
@@ -457,157 +417,91 @@ function TradedPlayRow({ row, currency, fxRate, ...actions }: PlayRowProps) {
         actions.onEdit(setup);
       }}
       className={cn(
-        "group/play flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2.5",
-        "transition-colors duration-100 hover:bg-accent motion-reduce:transition-none",
-        PLAY_GRID,
+        "group/setup flex min-w-0 cursor-pointer flex-col overflow-hidden rounded-lg border border-border bg-card",
+        "transition-[border-color,background-color,transform] duration-150 hover:border-primary/40 hover:bg-accent/30 motion-reduce:transition-none",
       )}
     >
-      <div className="flex min-w-0 flex-1 items-center gap-3">
-        <PlayIcon setup={setup} tone={netPnl < 0 ? "neg" : "pos"} />
-        <div className="min-w-0">
-          <div className="flex min-w-0 items-center gap-2">
-            <button
-              type="button"
-              onClick={() => actions.onEdit(setup)}
-              className={cn(
-                "cursor-pointer truncate rounded-sm text-left text-[14px] font-semibold tracking-tight text-foreground",
-                "outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-              )}
-            >
-              {setup.name}
-            </button>
+      <SetupChartPreview setup={setup} />
+      <div className="flex flex-1 flex-col gap-3 p-4">
+        <div className="flex min-w-0 items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => actions.onEdit(setup)}
+                className={cn(
+                  "cursor-pointer truncate rounded-sm text-left text-[15px] font-semibold tracking-tight text-foreground",
+                  "outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                )}
+              >
+                {setup.name}
+              </button>
+              <Pill tone={rangeStatus === "traded" ? "pos" : "accent"} className="px-1.5 py-0 text-[10px]">
+                {rangeStatus === "traded" ? "Traded" : "Not traded"}
+              </Pill>
+            </div>
+            {date ? (
+              <p className="mt-1 inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                <CalendarDays size={12} strokeWidth={1.75} aria-hidden />
+                {date}
+              </p>
+            ) : null}
+          </div>
+          <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
             {setup.symbol ? (
               <Pill tone="accent" className="px-1.5 py-0 text-[10px]">
                 {setup.symbol}
-                {setup.direction ? ` · ${directionLabel}` : ""}
               </Pill>
             ) : null}
+            <Pill tone="muted" className="px-1.5 py-0 text-[10px]">
+              {directionLabel}
+            </Pill>
           </div>
-          {subline ? (
-            <p className="mt-0.5 truncate text-[12px] leading-relaxed text-muted-foreground">
-              {subline}
-            </p>
-          ) : null}
-          <PlayExamples setup={setup} />
-          <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-[11px] tabular-nums whitespace-nowrap text-muted-foreground xl:hidden">
-            <span>
-              {trades} trade{trades === 1 ? "" : "s"}
-            </span>
-            <span aria-hidden>·</span>
-            <span>{fmtPct(winRate, locale)} WR</span>
-            <span aria-hidden>·</span>
-            <span className={cn("font-semibold", pnlColor(netPnl))}>{money(netPnl)}</span>
-          </p>
         </div>
+
+        <div className="grid gap-3 text-[12px] leading-relaxed">
+          <div>
+            <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Entry triggers
+            </div>
+            <p className="line-clamp-2 text-foreground">{entryValidation}</p>
+          </div>
+          <div>
+            <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Exit & invalidation
+            </div>
+            <p className="line-clamp-2 text-foreground">{exitValidation}</p>
+          </div>
+          <div>
+            <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Notes
+            </div>
+            <p className="line-clamp-2 text-muted-foreground">{notes}</p>
+          </div>
+        </div>
+
+        {subline ? <PlayExamples setup={setup} compact /> : null}
+
+        {rangeStatus === "traded" ? (
+          <div className="grid grid-cols-2 gap-2 border-t border-border pt-3 text-[11px] tabular-nums text-muted-foreground sm:grid-cols-4">
+            <span>{trades} trade{trades === 1 ? "" : "s"}</span>
+            <span>{fmtPct(winRate, locale)} WR</span>
+            <span>PF {pf > 0 ? pf.toFixed(2) : "—"}</span>
+            <span className={cn("font-semibold", pnlColor(netPnl))}>{money(netPnl)}</span>
+          </div>
+        ) : null}
       </div>
 
-      <div className="hidden xl:contents">
-        <MetricCell value={String(trades)} />
-        <MetricCell
-          value={fmtPct(winRate, locale)}
-          ratio={winRate}
-          title={`${wins} win${wins === 1 ? "" : "s"} · ${losses} loss${losses === 1 ? "" : "es"}`}
-        />
-        <MetricCell value={pf > 0 ? pf.toFixed(2) : "—"} />
-        <MetricCell value={money(exp)} valueClass={pnlColor(exp)} />
-        <MetricCell value={money(netPnl)} valueClass={cn("text-[14px]", pnlColor(netPnl))} />
-      </div>
-
-      <ItemActions className="gap-0.5 xl:justify-end">
+      <ItemActions className="border-t border-border px-3 py-2">
         <SetupActions setup={setup} {...actions} />
       </ItemActions>
     </div>
   );
 }
 
-/**
- * Idle plays are chips sized to their own name rather than cells in a stretched
- * grid: name and actions stay adjacent, so nothing floats in a column of gutter.
- * `ItemContent` is deliberately skipped — its `flex-1` is what would stretch the
- * name away from the buttons. Detail (thesis, levels, checklist) lives in the
- * editor these chips open.
- */
-function UnusedPlayChip({ row, ...actions }: { row: SetupRowModel } & RowActions) {
-  const { setup } = row;
-
-  return (
-    <Item
-      variant="muted"
-      size="sm"
-      onClick={(e) => {
-        // Chip surface opens the editor; the trade/edit/delete buttons stay their own targets.
-        if ((e.target as HTMLElement).closest("button")) return;
-        actions.onEdit(setup);
-      }}
-      className="w-fit cursor-pointer gap-2 py-1 pr-1 pl-2.5 hover:bg-accent"
-      title={setupSubline(setup) || undefined}
-    >
-      <PlayIcon setup={setup} tone="muted" chip />
-      <ItemTitle className="gap-1.5 text-[13px] tracking-tight">
-        <span className="max-w-[14rem] truncate">{setup.name}</span>
-        {setup.symbol ? (
-          <span className="shrink-0 text-[11px] tracking-wide text-primary">{setup.symbol}</span>
-        ) : null}
-      </ItemTitle>
-      <PlayExamples setup={setup} compact />
-      <ItemActions className="gap-0.5">
-        <SetupActions setup={setup} {...actions} />
-      </ItemActions>
-    </Item>
-  );
-}
-
 // ---------------------------------------------------------------------------
 // Header pieces
 // ---------------------------------------------------------------------------
-
-function ColumnSortButton({
-  label,
-  sortKey,
-  active,
-  dir,
-  onSort,
-  align = "end",
-}: {
-  label: string;
-  sortKey: SortKey;
-  active: boolean;
-  dir: SortDir;
-  onSort: (key: SortKey) => void;
-  align?: "start" | "end";
-}) {
-  return (
-    <button
-      type="button"
-      onClick={() => onSort(sortKey)}
-      aria-label={`Sort by ${label}`}
-      className={cn(
-        "group/col flex cursor-pointer items-center gap-1 rounded-sm outline-none",
-        align === "start" ? "justify-self-start" : "justify-end",
-        "text-[10px] font-medium tracking-[0.08em] uppercase",
-        "transition-colors duration-150 hover:text-foreground motion-reduce:transition-none",
-        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-        active ? "text-foreground" : "text-muted-foreground",
-      )}
-    >
-      {label}
-      {active ? (
-        dir === "asc" ? (
-          <ChevronUp size={11} strokeWidth={2} aria-hidden />
-        ) : (
-          <ChevronDown size={11} strokeWidth={2} aria-hidden />
-        )
-      ) : (
-        <ChevronsUpDown
-          size={11}
-          strokeWidth={2}
-          aria-hidden
-          className="opacity-0 transition-opacity group-hover/col:opacity-60"
-        />
-      )}
-    </button>
-  );
-}
 
 function SummaryStat({
   label,
@@ -691,7 +585,7 @@ function PlaybookPerformancePanel({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="text-[13px] font-semibold tracking-tight text-foreground">
-            Playbook performance
+            Setup Library performance
           </h3>
           <p className="mt-0.5 text-[12px] text-muted-foreground">
             Ranking combines profitability, expectancy, R stats, drawdown, and sample size.
@@ -733,7 +627,7 @@ function PlaybookPerformancePanel({
         <table className="w-full min-w-[46rem] text-left text-[12px]">
           <thead className="text-[10px] tracking-[0.08em] text-muted-foreground uppercase">
             <tr className="border-b border-border">
-              <th className="py-2 pr-3 font-medium">Playbook</th>
+              <th className="py-2 pr-3 font-medium">Setup</th>
               <th className="px-3 py-2 text-right font-medium">Sample</th>
               <th className="px-3 py-2 text-right font-medium">Avg R</th>
               <th className="px-3 py-2 text-right font-medium">Total R</th>
@@ -837,15 +731,6 @@ export function PlaybookView({
     return { trades, wins, netPnl, winRate: trades > 0 ? wins / trades : 0, best };
   }, [traded]);
 
-  function sortBy(key: SortKey) {
-    if (key === sort) {
-      setDir((d) => (d === "asc" ? "desc" : "asc"));
-      return;
-    }
-    setSort(key);
-    setDir(DEFAULT_DIR[key]);
-  }
-
   function convertSetup(setup: Setup) {
     let side: "long" | "short" | undefined =
       setup.direction === "short" ? "short" : setup.direction === "long" ? "long" : undefined;
@@ -877,16 +762,16 @@ export function PlaybookView({
   };
 
   const subtitle = () => {
-    if (setups.length === 0) return "Define your plays once, then log trades straight from them.";
-    const plays = `${setups.length} play${setups.length === 1 ? "" : "s"}`;
-    if (traded.length === 0) return `${plays} · none traded in this range`;
-    return `${plays} · ${traded.length} traded in this range`;
+    if (setups.length === 0) return "Define your setups once, then log trades straight from them.";
+    const setupCount = `${setups.length} setup${setups.length === 1 ? "" : "s"}`;
+    if (traded.length === 0) return `${setupCount} · none traded in this range`;
+    return `${setupCount} · ${traded.length} traded in this range`;
   };
 
   const header = (
     <header className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
       <div className="min-w-0">
-        <h2 className="text-[15px] font-semibold tracking-tight text-foreground">Playbook</h2>
+        <h2 className="text-[15px] font-semibold tracking-tight text-foreground">Setup Library</h2>
         <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">{subtitle()}</p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
@@ -900,7 +785,7 @@ export function PlaybookView({
             />
             <NativeSelect
               size="sm"
-              aria-label="Sort plays"
+              aria-label="Sort setups"
               value={sort}
               onChange={(e) => {
                 const key = e.target.value as SortKey;
@@ -952,7 +837,7 @@ export function PlaybookView({
         <SummaryStat
           label="Plays traded"
           value={`${traded.length}/${setups.length}`}
-          sub={unused.length > 0 ? `${unused.length} idle` : "All plays in use"}
+          sub={unused.length > 0 ? `${unused.length} idle` : "All setups in use"}
         />
         <SummaryStat label="Trades" value={String(totals.trades)} />
         <SummaryStat
@@ -967,7 +852,7 @@ export function PlaybookView({
         />
         {totals.best ? (
           <SummaryStat
-            label="Top play"
+            label="Top setup"
             value={totals.best.setup.name}
             valueClass="tracking-tight"
             sub={fmtSignedMoney(totals.best.netPnl * fxRate, currency, locale)}
@@ -982,42 +867,18 @@ export function PlaybookView({
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-4">
         <h3 className="text-xs font-medium text-muted-foreground">Traded in this range</h3>
         <span className="text-[11px] tabular-nums text-muted-foreground">
-          {traded.length} play{traded.length === 1 ? "" : "s"}
+          {traded.length} setup{traded.length === 1 ? "" : "s"}
         </span>
       </div>
 
-      <div className={cn("hidden px-4 pt-3 pb-1", PLAY_GRID)}>
-        {/* Offset by the row icon (size-9 + gap-3) so the label sits over the names. */}
-        <span className="pl-12">
-          <ColumnSortButton
-            label="Play"
-            sortKey="name"
-            active={sort === "name"}
-            dir={dir}
-            onSort={sortBy}
-            align="start"
-          />
-        </span>
-        {METRIC_COLUMNS.map((col) => (
-          <ColumnSortButton
-            key={col.key}
-            label={col.label}
-            sortKey={col.key}
-            active={sort === col.key}
-            dir={dir}
-            onSort={sortBy}
-          />
-        ))}
-        <span />
-      </div>
-
-      <ItemGroup className="mt-1 gap-0.5 px-2">
+      <ItemGroup className="mt-3 grid gap-4 px-4 sm:grid-cols-2 xl:grid-cols-3">
         {traded.map((row) => (
-          <TradedPlayRow
+          <SetupLibraryCard
             key={row.setup.id}
             row={row}
             currency={displayCurrency}
             fxRate={fxRate}
+            rangeStatus="traded"
             {...rowActions}
           />
         ))}
@@ -1030,12 +891,19 @@ export function PlaybookView({
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-4">
         <h3 className="text-xs font-medium text-muted-foreground">Not traded in this range</h3>
         <span className="text-[11px] tabular-nums text-muted-foreground">
-          {unused.length} play{unused.length === 1 ? "" : "s"}
+          {unused.length} setup{unused.length === 1 ? "" : "s"}
         </span>
       </div>
-      <ItemGroup className="mt-3 flex-row flex-wrap gap-2 px-4">
+      <ItemGroup className="mt-3 grid gap-4 px-4 sm:grid-cols-2 xl:grid-cols-3">
         {unused.map((row) => (
-          <UnusedPlayChip key={row.setup.id} row={row} {...rowActions} />
+          <SetupLibraryCard
+            key={row.setup.id}
+            row={row}
+            currency={displayCurrency}
+            fxRate={fxRate}
+            rangeStatus="unused"
+            {...rowActions}
+          />
         ))}
       </ItemGroup>
     </Card>
@@ -1052,7 +920,7 @@ export function PlaybookView({
       return (
         <EmptyState
           title="No setups yet"
-          hint="Define your edge — thesis, levels, and checklist — then log trades from each play."
+          hint="Define your edge — thesis, levels, and checklist — then log trades from each setup."
           icon={<BookOpen size={28} strokeWidth={1.5} />}
           actions={
             <Button type="button" onClick={() => openModal("new-setup")}>
@@ -1067,8 +935,8 @@ export function PlaybookView({
     if (traded.length === 0 && hideUnused) {
       return (
         <EmptyState
-          title="No traded plays"
-          hint="Every play is still unused in this date range. Log a trade or show unused plays."
+          title="No traded setups"
+          hint="Every setup is still unused in this date range. Log a trade or show unused setups."
           icon={<BookOpen size={28} strokeWidth={1.5} />}
           actions={
             <Button type="button" variant="outline" onClick={() => setHideUnused(false)}>
