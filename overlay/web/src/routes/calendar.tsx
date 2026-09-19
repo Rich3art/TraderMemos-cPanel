@@ -196,6 +196,9 @@ function CalendarPage() {
         currency={currency}
         onSelectTrade={(t) => setSelectedTradeId(t.id)}
         onOpenDayReview={(day) => void navigate({ to: "/day/$date", params: { date: day } })}
+        onOpenSessionPlan={(day) =>
+          void navigate({ to: "/playbook", search: { tab: "session-plan", date: day } })
+        }
         onNewTrade={() => openModal("new-trade")}
         onNewNote={() => {
           const day = selectedDay ?? new Date().toISOString().slice(0, 10);

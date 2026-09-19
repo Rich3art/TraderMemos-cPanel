@@ -46,6 +46,8 @@ export interface PlaybookViewProps {
   breakdown: BreakGroup[];
   breakdownLoading: boolean;
   currency: string;
+  initialTab?: PlaybookTab;
+  initialDate?: string;
   onDelete: (id: string) => Promise<void>;
 }
 
@@ -228,13 +230,15 @@ function SessionPlanTab({
   setups,
   currency,
   fxRate,
+  initialDate,
 }: {
   setups: Setup[];
   currency: string;
   fxRate: number;
+  initialDate?: string;
 }) {
   const locale = intlLocale();
-  const [date, setDate] = useState(todayInputDate);
+  const [date, setDate] = useState(initialDate || todayInputDate);
   const [body, setBody] = useState("");
   const [selectedSetups, setSelectedSetups] = useState<string[]>([]);
   const [selectedSymbol, setSelectedSymbol] = useState("");
@@ -266,6 +270,10 @@ function SessionPlanTab({
     }
     return [...values].sort();
   }, [setups, trades]);
+
+  useEffect(() => {
+    if (initialDate) setDate(initialDate);
+  }, [initialDate]);
 
   useEffect(() => {
     if (!plan) {
@@ -1003,6 +1011,8 @@ export function PlaybookView({
   setupsError,
   breakdown,
   currency,
+  initialTab = "setup-library",
+  initialDate,
   onDelete,
 }: PlaybookViewProps) {
   usePrivacyMode();
@@ -1015,7 +1025,11 @@ export function PlaybookView({
   const [sort, setSort] = useState<SortKey>("name");
   const [dir, setDir] = useState<SortDir>("asc");
   const [hideUnused, setHideUnused] = useState(false);
-  const [activeTab, setActiveTab] = useState<PlaybookTab>("setup-library");
+  const [activeTab, setActiveTab] = useState<PlaybookTab>(initialTab);
+
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
 
   const rows = useMemo(() => buildRows(setups, breakdown), [setups, breakdown]);
   const traded = useMemo(
@@ -1328,7 +1342,12 @@ export function PlaybookView({
     <Page>
       {playbookHeader}
       {activeTab === "session-plan" ? (
-        <SessionPlanTab setups={setups} currency={displayCurrency} fxRate={fxRate} />
+        <SessionPlanTab
+          setups={setups}
+          currency={displayCurrency}
+          fxRate={fxRate}
+          initialDate={initialDate}
+        />
       ) : activeTab === "setup-library" ? (
         <>
           {setupLibraryHeader}

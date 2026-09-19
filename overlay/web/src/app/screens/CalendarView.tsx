@@ -105,6 +105,7 @@ export interface CalendarViewProps {
   /** Quick peek drawer */
   onSelectTrade: (t: Trade) => void;
   onOpenDayReview?: (day: string) => void;
+  onOpenSessionPlan?: (day: string) => void;
   onNewTrade?: () => void;
   onNewNote?: () => void;
 }
@@ -168,6 +169,7 @@ export function CalendarView({
   currency,
   onSelectTrade,
   onOpenDayReview,
+  onOpenSessionPlan,
   onNewTrade,
   onNewNote,
 }: CalendarViewProps) {
@@ -545,6 +547,31 @@ export function CalendarView({
                           const winRate = dayWinRate(rec);
                           const isSelected = selectedDay === cell.date;
                           const isToday = cell.date === today;
+                          const planAction = onOpenSessionPlan ? (
+                            <span
+                              role="button"
+                              tabIndex={0}
+                              aria-label={`Plan session for ${cell.date}`}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                onOpenSessionPlan(cell.date);
+                              }}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter" || event.key === " ") {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  onOpenSessionPlan(cell.date);
+                                }
+                              }}
+                              className={cn(
+                                "mt-auto self-center rounded border border-border/70 bg-background/70 px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground shadow-sm",
+                                "hover:border-ring hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring",
+                                "@max-[3.5rem]/day:px-1 @max-[3.5rem]/day:text-[9px]",
+                              )}
+                            >
+                              Plan
+                            </span>
+                          ) : null;
                           const dayBody = (
                             <>
                               <span
@@ -603,6 +630,7 @@ export function CalendarView({
                                   )}
                                 </span>
                               ) : null}
+                              {planAction}
                             </>
                           );
                           const dayClass = cn(
