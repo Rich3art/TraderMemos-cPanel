@@ -29,6 +29,7 @@ vi.mock("../../components/charts/TradeChart", () => ({
     return <div data-testid="setup-symbol-chart" />;
   },
   readStoredChartDrawings: () => () => [],
+  clearStoredChartDrawings: () => () => undefined,
 }));
 
 vi.mock("../../lib/hooks/useMarketBars", () => ({

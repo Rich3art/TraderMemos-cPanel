@@ -17,6 +17,20 @@ vi.mock("../../lib/hooks/useAuthedAttachmentUrls", () => ({
     new Map(ids.map((id) => [id, `/setup-attachments/${id}/file`])),
 }));
 
+vi.mock("../../lib/api/chartAnnotations", () => ({
+  chartAnnotationsApi: {
+    get: vi.fn<(...args: any[]) => any>(() =>
+      Promise.resolve({
+        entity_type: "setup",
+        entity_id: "s1",
+        symbol: "AAPL",
+        interval: "240",
+        drawings: [],
+      }),
+    ),
+  },
+}));
+
 const noop = async () => {};
 const base = {
   setupsLoading: false,
@@ -138,13 +152,13 @@ describe("PlaybookView", () => {
     wrap(<PlaybookView {...base} setups={[setup]} breakdown={[group]} />);
     expect(screen.getByText("Plays traded")).toBeInTheDocument();
     expect(screen.getByText("1/1")).toBeInTheDocument();
-    expect(screen.getByText("Top play")).toBeInTheDocument();
+    expect(screen.getByText("Top setup")).toBeInTheDocument();
     expect(screen.getByText("3 of 5 won")).toBeInTheDocument();
   });
 
   it("shows playbook profitability and R analysis", () => {
     wrap(<PlaybookView {...base} setups={[setup]} breakdown={[group]} />);
-    expect(screen.getByText("Playbook performance")).toBeInTheDocument();
+    expect(screen.getByText("Setup Library performance")).toBeInTheDocument();
     expect(screen.getByText("Best performer")).toBeInTheDocument();
     expect(screen.getByText("Most profitable")).toBeInTheDocument();
     expect(screen.getByText("Best expectancy")).toBeInTheDocument();
@@ -157,8 +171,8 @@ describe("PlaybookView", () => {
 
   it("shows setup screenshots as playbook examples", () => {
     wrap(<PlaybookView {...base} setups={[setupWithExamples]} breakdown={[group]} />);
-    expect(screen.getByLabelText("2 playbook example screenshots")).toBeInTheDocument();
-    expect(screen.getByAltText("clean-breakout.png")).toHaveAttribute(
+    expect(screen.getByLabelText("2 setup example screenshots")).toBeInTheDocument();
+    expect(screen.getAllByAltText("clean-breakout.png")[0]).toHaveAttribute(
       "src",
       "/setup-attachments/shot-1/file",
     );
@@ -206,15 +220,16 @@ describe("PlaybookView", () => {
     expect(screen.getAllByText("ORB").length).toBeGreaterThan(0);
   });
 
-  it("labels metric columns once, as sort controls", () => {
+  it("labels metric sorting through the setup sort selector", () => {
     wrap(<PlaybookView {...base} setups={[setup]} breakdown={[group]} />);
     expect(screen.getByRole("listitem")).toBeInTheDocument();
+    const sort = screen.getByLabelText("Sort setups");
     for (const label of ["Trades", "Win rate", "Profit factor", "Expectancy", "Net P&L"]) {
-      expect(screen.getByRole("button", { name: `Sort by ${label}` })).toBeInTheDocument();
+      expect(sort).toHaveTextContent(label);
     }
   });
 
-  it("sorts traded plays by a metric column and flips direction on re-click", async () => {
+  it("sorts traded plays by a metric", async () => {
     const second: Setup = { ...setup, id: "s2", name: "Fade", symbol: "MSFT" };
     const secondGroup = {
       ...group,
@@ -223,19 +238,14 @@ describe("PlaybookView", () => {
     } as BreakGroup;
     wrap(<PlaybookView {...base} setups={[setup, second]} breakdown={[group, secondGroup]} />);
 
-    const rowNames = () =>
-      screen.getAllByRole("listitem").map((li) => li.textContent?.startsWith("Fade") ?? false);
+    const rowNames = () => screen.getAllByRole("listitem").map((li) => li.textContent ?? "");
 
     // Name sort (default) puts Fade first.
-    expect(rowNames()[0]).toBe(true);
+    expect(rowNames()[0]).toContain("Fade");
 
     // Net P&L descending puts the bigger winner (Fade, +$900) first.
-    await userEvent.click(screen.getByRole("button", { name: /sort by net p&l/i }));
-    expect(rowNames()[0]).toBe(true);
-
-    // Re-click flips to ascending, so ORB (+$500) leads.
-    await userEvent.click(screen.getByRole("button", { name: /sort by net p&l/i }));
-    expect(rowNames()[0]).toBe(false);
+    await userEvent.selectOptions(screen.getByLabelText("Sort setups"), "pnl");
+    expect(rowNames()[0]).toContain("Fade");
   });
 
   it("groups untraded plays into their own section", () => {
