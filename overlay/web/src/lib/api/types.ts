@@ -392,7 +392,7 @@ export interface CashTransaction {
   created_at: string;
 }
 
-export type JournalNoteType = "note" | "daily_log";
+export type JournalNoteType = "note" | "daily_log" | "session_plan";
 
 export interface JournalNoteSymbol {
   symbol: string;

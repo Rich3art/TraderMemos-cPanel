@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { SetupAttachment, TradeDetail } from "./api/types";
+import type { JournalNoteType, SetupAttachment, TradeDetail } from "./api/types";
 
 export type ModalKind = "new-trade" | "new-setup" | "new-note" | "new-guide";
 export type SetupDirection = "long" | "short" | "unknown";
@@ -30,7 +30,7 @@ export interface SetupDraft {
 /** Prefill payload when editing a journal note. */
 export interface NoteDraft {
   id: string;
-  type: "note" | "daily_log";
+  type: JournalNoteType;
   occurredAt: string;
   title: string;
   body: string;

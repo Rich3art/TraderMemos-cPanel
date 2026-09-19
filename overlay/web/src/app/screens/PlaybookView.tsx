@@ -8,26 +8,30 @@ import {
   ListFilter,
   Pencil,
   Plus,
+  Save,
   Trash2,
   X,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/Card";
 import { EmptyState } from "@/components/EmptyState";
 import { ItemActions, ItemGroup } from "@/components/Item";
 import { Page } from "@/components/Page";
 import { Pill } from "@/components/Pill";
+import { RichTextEditor } from "@/components/RichTextEditor";
 import { ListSkeleton } from "@/components/skeletons/list-skeleton";
 import { pnlColor } from "@/components/theme-tokens";
 import { Button } from "@/components/ui/button";
 import { setupsApi } from "@/lib/api/setups";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
-import type { BreakGroup, Setup } from "@/lib/api/types";
+import type { BreakGroup, Setup, Trade } from "@/lib/api/types";
 import { cn } from "@/lib/cn";
 import { usePrivacyMode } from "@/lib/displayPrefs";
 import { fmtPct, fmtSignedMoney } from "@/lib/format";
 import { useMoneyFx } from "@/lib/hooks/useMoneyFx";
 import { useAuthedAttachmentUrls } from "@/lib/hooks/useAuthedAttachmentUrls";
+import { useCreateNote, useNotes, useUpdateNote } from "@/lib/hooks/useNotes";
+import { useTrades } from "@/lib/hooks/useTrades";
 import { intlLocale } from "@/lib/locale";
 import { useUI, type SetupDraft } from "@/lib/ui";
 
@@ -47,6 +51,7 @@ export interface PlaybookViewProps {
 
 type SortKey = "name" | "trades" | "winRate" | "pf" | "exp" | "pnl";
 type SortDir = "asc" | "desc";
+type PlaybookTab = "daily-review" | "trading-notes" | "session-plan" | "setup-library";
 
 interface SetupRowModel {
   setup: Setup;
@@ -72,6 +77,14 @@ const METRIC_COLUMNS: { key: SortKey; label: string }[] = [
 const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: "name", label: "Name" },
   ...METRIC_COLUMNS,
+];
+
+const SESSION_CHECKLIST = [
+  "Reviewed economic calendar",
+  "Defined key levels",
+  "Confirmed setup rules",
+  "Risk limits checked",
+  "Execution alerts ready",
 ];
 
 /** Metric sorts read best high-to-low; names read A→Z. */
@@ -170,6 +183,309 @@ function formatSetupDate(setup: Setup): string {
     month: "2-digit",
     day: "2-digit",
   }).format(date);
+}
+
+function todayInputDate(): string {
+  const now = new Date();
+  const offset = now.getTimezoneOffset();
+  return new Date(now.getTime() - offset * 60_000).toISOString().slice(0, 10);
+}
+
+function dayBounds(date: string): { from: string; to: string } {
+  return { from: date, to: date };
+}
+
+function sameDatePrefix(value: string | null | undefined, date: string): boolean {
+  return Boolean(value && value.slice(0, 10) === date);
+}
+
+function tradeIsForDate(trade: Trade, date: string): boolean {
+  return sameDatePrefix(trade.closed_at, date) || sameDatePrefix(trade.opened_at, date);
+}
+
+function planSetupList(body: string): string[] {
+  const match = body.match(/<!-- planned-setups:([\s\S]*?) -->/);
+  if (!match) return [];
+  try {
+    const parsed = JSON.parse(match[1]) as unknown;
+    return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function stripPlanMeta(body: string): string {
+  return body.replace(/\n?\s*<!-- planned-setups:[\s\S]*? -->\s*/g, "").trim();
+}
+
+function withPlanMeta(body: string, setupIds: string[]): string {
+  const clean = stripPlanMeta(body);
+  const meta = `<!-- planned-setups:${JSON.stringify(setupIds)} -->`;
+  return clean ? `${clean}\n\n${meta}` : meta;
+}
+
+function SessionPlanTab({
+  setups,
+  currency,
+  fxRate,
+}: {
+  setups: Setup[];
+  currency: string;
+  fxRate: number;
+}) {
+  const locale = intlLocale();
+  const [date, setDate] = useState(todayInputDate);
+  const [body, setBody] = useState("");
+  const [selectedSetups, setSelectedSetups] = useState<string[]>([]);
+  const [selectedSymbol, setSelectedSymbol] = useState("");
+  const [dirty, setDirty] = useState(false);
+  const notesQ = useNotes(dayBounds(date));
+  const tradesQ = useTrades(dayBounds(date));
+  const createNote = useCreateNote();
+  const updateNote = useUpdateNote();
+
+  const plan = useMemo(
+    () => (notesQ.data ?? []).find((note) => note.type === "session_plan"),
+    [notesQ.data],
+  );
+  const trades = useMemo(
+    () => (tradesQ.data ?? []).filter((trade) => tradeIsForDate(trade, date)),
+    [tradesQ.data, date],
+  );
+  const planned = useMemo(
+    () => setups.filter((setup) => selectedSetups.includes(setup.id)),
+    [setups, selectedSetups],
+  );
+  const symbols = useMemo(() => {
+    const values = new Set<string>();
+    for (const setup of setups) {
+      if (setup.symbol) values.add(setup.symbol.toUpperCase());
+    }
+    for (const trade of trades) {
+      if (trade.symbol) values.add(trade.symbol.toUpperCase());
+    }
+    return [...values].sort();
+  }, [setups, trades]);
+
+  useEffect(() => {
+    if (!plan) {
+      setBody("");
+      setSelectedSetups([]);
+      setDirty(false);
+      return;
+    }
+    setBody(stripPlanMeta(plan.body));
+    setSelectedSetups(planSetupList(plan.body));
+    setDirty(false);
+  }, [plan?.id, plan?.body, date]);
+
+  useEffect(() => {
+    if (!selectedSymbol && symbols.length > 0) setSelectedSymbol(symbols[0]);
+  }, [selectedSymbol, symbols]);
+
+  const stats = useMemo(() => {
+    const closed = trades.filter((trade) => trade.net_pnl != null);
+    const wins = closed.filter((trade) => (trade.net_pnl ?? 0) > 0).length;
+    const net = closed.reduce((sum, trade) => sum + (trade.net_pnl ?? 0), 0);
+    return {
+      trades: closed.length,
+      wins,
+      winRate: closed.length > 0 ? wins / closed.length : 0,
+      net,
+    };
+  }, [trades]);
+
+  const toggleSetup = (id: string) => {
+    setSelectedSetups((cur) =>
+      cur.includes(id) ? cur.filter((value) => value !== id) : [...cur, id],
+    );
+    setDirty(true);
+  };
+
+  const save = async () => {
+    const payload = {
+      type: "session_plan" as const,
+      occurred_at: date,
+      title: `Session plan ${date}`,
+      body: withPlanMeta(body, selectedSetups),
+      symbols: [],
+    };
+    if (plan) {
+      await updateNote.mutateAsync({ id: plan.id, body: payload });
+    } else {
+      await createNote.mutateAsync(payload);
+    }
+    setDirty(false);
+  };
+
+  const saving = createNote.isPending || updateNote.isPending;
+
+  return (
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(18rem,0.9fr)]">
+      <div className="space-y-4">
+        <Card className="space-y-3">
+          <label className="block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Session date
+          </label>
+          <input
+            type="date"
+            value={date}
+            onChange={(event) => setDate(event.target.value)}
+            className="h-9 rounded-md border border-border bg-muted px-3 text-sm text-foreground outline-none focus-visible:outline-2 focus-visible:outline-ring"
+          />
+        </Card>
+
+        <Card className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Chart
+              </h3>
+              <p className="text-[11px] text-muted-foreground">Plan the instrument you want to focus on.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <NativeSelect
+                size="sm"
+                value={selectedSymbol}
+                onChange={(event) => setSelectedSymbol(event.target.value)}
+                aria-label="Session plan symbol"
+                className="min-w-[9rem]"
+              >
+                {symbols.length === 0 ? (
+                  <NativeSelectOption value="">No symbols</NativeSelectOption>
+                ) : (
+                  symbols.map((symbol) => (
+                    <NativeSelectOption key={symbol} value={symbol}>
+                      {symbol}
+                    </NativeSelectOption>
+                  ))
+                )}
+              </NativeSelect>
+              <Button type="button" size="sm" variant="outline">
+                Load
+              </Button>
+            </div>
+          </div>
+          <div className="flex aspect-[16/7] min-h-[14rem] items-center justify-center rounded-md border border-border bg-background text-sm text-muted-foreground">
+            {selectedSymbol ? `${selectedSymbol} planning chart` : "Choose a symbol to load a chart"}
+          </div>
+        </Card>
+
+        <Card className="space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Game plan
+              </h3>
+              <p className="text-[11px] text-muted-foreground">Write the plan before the session starts.</p>
+            </div>
+            <span className="text-[11px] text-muted-foreground">
+              {dirty ? "Unsaved changes" : "No changes"}
+            </span>
+          </div>
+          <RichTextEditor
+            key={plan?.id ?? `new-${date}`}
+            value={body}
+            onChange={(value) => {
+              setBody(value);
+              setDirty(true);
+            }}
+            placeholder="Bias, key levels, invalidation, execution rules..."
+            minHeight={180}
+            showTemplates
+          />
+          <Button type="button" onClick={save} disabled={saving || (!dirty && Boolean(plan))}>
+            <Save size={14} strokeWidth={1.75} />
+            {saving ? "Saving..." : "Save session plan"}
+          </Button>
+        </Card>
+
+        <Card className="space-y-3">
+          <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Planned setups
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {setups.length === 0 ? (
+              <span className="text-sm text-muted-foreground">No setups in the library yet.</span>
+            ) : (
+              setups.map((setup) => (
+                <button
+                  key={setup.id}
+                  type="button"
+                  onClick={() => toggleSetup(setup.id)}
+                  className={cn(
+                    "rounded-md border px-2.5 py-1.5 text-[12px] transition-colors",
+                    selectedSetups.includes(setup.id)
+                      ? "border-ring bg-ring/10 text-foreground"
+                      : "border-border bg-muted text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {setup.name}
+                </button>
+              ))
+            )}
+          </div>
+        </Card>
+
+        <Card className="space-y-2">
+          <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Pre-session checklist
+          </h3>
+          <div className="space-y-2">
+            {SESSION_CHECKLIST.map((item) => (
+              <label key={item} className="flex items-center gap-2 text-sm text-muted-foreground">
+                <input type="checkbox" className="size-4 rounded border-border bg-muted" />
+                {item}
+              </label>
+            ))}
+          </div>
+        </Card>
+      </div>
+
+      <aside className="space-y-4">
+        <Card className="space-y-4">
+          <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
+            That day's execution
+          </h3>
+          <div className="space-y-3">
+            <SummaryStat label="Trades" value={String(stats.trades)} />
+            <SummaryStat label="Win rate" value={fmtPct(stats.winRate, locale)} />
+            <SummaryStat
+              label="Net P&L"
+              value={fmtSignedMoney(stats.net * fxRate, currency, locale)}
+              valueClass={pnlColor(stats.net)}
+            />
+          </div>
+          <div className="border-t border-border pt-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Plan adherence
+            </p>
+            {planned.length > 0 ? (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {planned.map((setup) => (
+                  <Pill key={setup.id}>{setup.name}</Pill>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-2 text-sm text-muted-foreground">No setups selected.</p>
+            )}
+          </div>
+        </Card>
+        <Card className="space-y-3">
+          <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Trading notes
+          </h3>
+          {plan ? (
+            <p className="line-clamp-6 whitespace-pre-wrap text-sm text-muted-foreground">
+              {stripPlanMeta(plan.body) || "No notes yet."}
+            </p>
+          ) : (
+            <p className="text-sm text-muted-foreground">No session plan saved for this day.</p>
+          )}
+        </Card>
+      </aside>
+    </div>
+  );
 }
 
 function PlayExamples({ setup, compact = false }: { setup: Setup; compact?: boolean }) {
@@ -699,6 +1015,7 @@ export function PlaybookView({
   const [sort, setSort] = useState<SortKey>("name");
   const [dir, setDir] = useState<SortDir>("asc");
   const [hideUnused, setHideUnused] = useState(false);
+  const [activeTab, setActiveTab] = useState<PlaybookTab>("setup-library");
 
   const rows = useMemo(() => buildRows(setups, breakdown), [setups, breakdown]);
   const traded = useMemo(
@@ -768,11 +1085,11 @@ export function PlaybookView({
     return `${setupCount} · ${traded.length} traded in this range`;
   };
 
-  const playbookTabs = [
-    { label: "Daily Review", count: null, active: false },
-    { label: "Trading Notes", count: null, active: false },
-    { label: "Session Plan", count: null, active: false },
-    { label: "Setup Library", count: setups.length, active: true },
+  const playbookTabs: { id: PlaybookTab; label: string; count: number | null }[] = [
+    { id: "daily-review", label: "Daily Review", count: null },
+    { id: "trading-notes", label: "Trading Notes", count: null },
+    { id: "session-plan", label: "Session Plan", count: null },
+    { id: "setup-library", label: "Setup Library", count: setups.length },
   ];
 
   const playbookHeader = (
@@ -792,16 +1109,16 @@ export function PlaybookView({
       >
         {playbookTabs.map((tab) => (
           <button
-            key={tab.label}
+            key={tab.id}
             type="button"
             role="tab"
-            aria-selected={tab.active}
-            disabled={!tab.active}
+            aria-selected={activeTab === tab.id}
+            onClick={() => setActiveTab(tab.id)}
             className={cn(
               "inline-flex h-9 shrink-0 items-center gap-2 rounded-md border px-3 text-[12px] font-medium transition-colors",
-              tab.active
+              activeTab === tab.id
                 ? "border-border bg-surface text-foreground shadow-sm"
-                : "border-transparent text-muted-foreground opacity-70",
+                : "border-transparent text-muted-foreground hover:border-border hover:text-foreground",
             )}
           >
             {tab.label}
@@ -1010,8 +1327,20 @@ export function PlaybookView({
   return (
     <Page>
       {playbookHeader}
-      {setupLibraryHeader}
-      {renderContent()}
+      {activeTab === "session-plan" ? (
+        <SessionPlanTab setups={setups} currency={displayCurrency} fxRate={fxRate} />
+      ) : activeTab === "setup-library" ? (
+        <>
+          {setupLibraryHeader}
+          {renderContent()}
+        </>
+      ) : (
+        <EmptyState
+          title="Coming next"
+          hint="This Playbook section is reserved for the next workflow task."
+          icon={<BookOpen size={28} strokeWidth={1.5} />}
+        />
+      )}
     </Page>
   );
 }

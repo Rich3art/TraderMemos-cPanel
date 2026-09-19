@@ -29,8 +29,9 @@ type noteSymbolDTO struct {
 }
 
 const (
-	noteTypeNote     = "note"
-	noteTypeDailyLog = "daily_log"
+	noteTypeNote        = "note"
+	noteTypeDailyLog    = "daily_log"
+	noteTypeSessionPlan = "session_plan"
 )
 
 type noteDTO struct {
@@ -58,6 +59,8 @@ func normalizeNoteType(raw string) (string, bool) {
 		return noteTypeNote, true
 	case noteTypeDailyLog:
 		return noteTypeDailyLog, true
+	case noteTypeSessionPlan:
+		return noteTypeSessionPlan, true
 	default:
 		return "", false
 	}
@@ -70,6 +73,9 @@ func defaultNoteTitle(noteType, title string) string {
 	}
 	if noteType == noteTypeDailyLog {
 		return "Daily log"
+	}
+	if noteType == noteTypeSessionPlan {
+		return "Session plan"
 	}
 	return "Untitled"
 }
@@ -189,7 +195,7 @@ func (s *Server) handleCreateNote(c *echo.Context) error {
 	}
 	noteType, ok := normalizeNoteType(in.Type)
 	if !ok {
-		return Fail(http.StatusBadRequest, "bad_request", "type must be note or daily_log", nil)
+		return Fail(http.StatusBadRequest, "bad_request", "type must be note, daily_log, or session_plan", nil)
 	}
 	symbols := normalizeNoteSymbols(in.Symbols)
 	if noteType != noteTypeDailyLog {
@@ -250,7 +256,7 @@ func (s *Server) handleUpdateNote(c *echo.Context) error {
 	}
 	noteType, ok := normalizeNoteType(in.Type)
 	if !ok {
-		return Fail(http.StatusBadRequest, "bad_request", "type must be note or daily_log", nil)
+		return Fail(http.StatusBadRequest, "bad_request", "type must be note, daily_log, or session_plan", nil)
 	}
 	symbols := normalizeNoteSymbols(in.Symbols)
 	if noteType != noteTypeDailyLog {
